@@ -1,7 +1,7 @@
 use futures_util::StreamExt;
-use object_path::{ObjectPath, EMPTY_OPTIONS};
+use object_path::{ObjectPath, ObjectPathError, EMPTY_OPTIONS};
 
-async fn count_lines(object_path: &ObjectPath) -> Result<usize, anyhow::Error> {
+async fn count_lines(object_path: &ObjectPath) -> Result<usize, ObjectPathError> {
     let mut stream = object_path.get().await?.into_stream();
     let mut newline_count: usize = 0;
     while let Some(bytes) = stream.next().await {
@@ -15,7 +15,7 @@ async fn count_lines(object_path: &ObjectPath) -> Result<usize, anyhow::Error> {
 
 // cmk how can you test in memory with a URL?
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<(), ObjectPathError> {
     let object_path = ObjectPath::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
         EMPTY_OPTIONS,

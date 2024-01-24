@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use bytes::Bytes;
 use core::fmt;
 use object_store::http::HttpBuilder;
@@ -6,6 +5,7 @@ use object_store::path::Path as StorePath;
 use object_store::{GetOptions, GetResult, ObjectStore};
 use std::ops::Deref;
 use std::sync::Arc;
+use thiserror::Error;
 use url::Url;
 
 #[derive(Debug)]
@@ -33,7 +33,7 @@ use url::Url;
 /// let store_path = StorePath::from_filesystem_path(&file_path)?; // StorePath
 /// let object_path = ObjectPath::new(arc_object_store, store_path); // ObjectPath
 /// assert_eq!(object_path.size().await?, 303);
-/// # Ok::<(), anyhow::Error>(())}).unwrap();
+/// # Ok::<(), ObjectPathError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime};
 /// ```
 pub struct ObjectPath {
@@ -74,14 +74,14 @@ impl ObjectPath {
     /// let url: String = sample_bed_url("plink_sim_10s_100v_10pmiss.bed")?;
     /// let object_path: ObjectPath<_> = ObjectPath::from_url(url, EMPTY_OPTIONS)?;
     /// assert_eq!(object_path.size().await?, 303);
-    /// # Ok::<(), anyhow::Error>(())}).unwrap();
+    /// # Ok::<(), ObjectPathError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime};
     /// ```
     pub fn new<I, K, V, S>(
         // cmk should we call this 'new'?
         location: S,
         options: I,
-    ) -> Result<ObjectPath, anyhow::Error>
+    ) -> Result<ObjectPath, ObjectPathError>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str>,
@@ -89,8 +89,8 @@ impl ObjectPath {
         S: AsRef<str>,
     {
         let location = location.as_ref();
-        let url =
-            Url::parse(location).map_err(|e| anyhow!("Cannot parse url: {} {}", location, e))?;
+        let url = Url::parse(location)
+            .map_err(|e| ObjectPathError::UrlParseError(location.to_string(), e.to_string()))?;
 
         let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
@@ -179,7 +179,7 @@ impl ObjectPath {
     // ///
     // /// let object_path: ObjectPath<_> = ObjectPath::new(object_store, store_path); // ObjectPath from owned values
     // /// assert_eq!(object_path.size().await?, 303);
-    // /// # Ok::<(), anyhow::Error>(())}).unwrap();
+    // /// # Ok::<(), ObjectPathError>(())}).unwrap();
     // /// # use {tokio::runtime::Runtime};
     // /// ```
     // pub fn new(arc_object_store: Arc<DynObjectStore>, path: StorePath) -> Self {
@@ -198,10 +198,10 @@ impl ObjectPath {
     /// # Runtime::new().unwrap().block_on(async {
     /// let mut object_path = sample_bed_object_path("plink_sim_10s_100v_10pmiss.bed")?;
     /// assert_eq!(object_path.size().await?, 303);
-    /// # Ok::<(), anyhow::Error>(())}).unwrap();
+    /// # Ok::<(), ObjectPathError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, bed_reader::BedErrorPlus};
     /// ```
-    pub async fn size(&self) -> Result<usize, anyhow::Error> {
+    pub async fn size(&self) -> Result<usize, ObjectPathError> {
         // cmk is this still needed?
         let get_result = self.get().await?;
         // LATER: See if https://github.com/apache/arrow-rs/issues/5272 if fixed in
@@ -214,7 +214,7 @@ impl ObjectPath {
     pub async fn get_ranges(
         &self,
         ranges: &[core::ops::Range<usize>],
-    ) -> Result<Vec<Bytes>, anyhow::Error> {
+    ) -> Result<Vec<Bytes>, ObjectPathError> {
         Ok(self
             .arc_object_store
             .get_ranges(&self.store_path, ranges)
@@ -222,7 +222,7 @@ impl ObjectPath {
     }
 
     /// Perform a get request with options
-    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, anyhow::Error> {
+    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, ObjectPathError> {
         Ok(self
             .arc_object_store
             .get_opts(&self.store_path, get_options)
@@ -230,7 +230,7 @@ impl ObjectPath {
     }
 
     /// Return the bytes that are stored at the specified location.
-    pub async fn get(&self) -> Result<GetResult, anyhow::Error> {
+    pub async fn get(&self) -> Result<GetResult, ObjectPathError> {
         Ok(self.arc_object_store.get(&self.store_path).await?)
     }
 
@@ -248,10 +248,10 @@ impl ObjectPath {
     /// assert_eq!(object_path.size().await?, 303);
     /// object_path.set_extension("fam")?;
     /// assert_eq!(object_path.size().await?, 130);
-    /// # Ok::<(), anyhow::Error>(())}).unwrap();
+    /// # Ok::<(), ObjectPathError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, bed_reader::BedErrorPlus};
     /// ```
-    pub fn set_extension(&mut self, extension: &str) -> Result<(), anyhow::Error> {
+    pub fn set_extension(&mut self, extension: &str) -> Result<(), ObjectPathError> {
         let mut path_str = self.store_path.to_string();
 
         // Find the last dot in the object path
@@ -295,4 +295,16 @@ impl DynObjectStore {
     pub fn new<T: ObjectStore + 'static>(store: T) -> Self {
         DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ObjectPathError {
+    #[error("Object store error: {0}")]
+    ObjectStoreError(#[from] object_store::Error),
+
+    #[error("Object store path error: {0}")]
+    ObjectStorePathError(#[from] object_store::path::Error),
+
+    #[error("Cannot parse URL: {0} {1}")]
+    UrlParseError(String, String),
 }
