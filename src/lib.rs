@@ -4,6 +4,7 @@ use core::fmt;
 use object_store::http::HttpBuilder;
 use object_store::path::Path as StorePath;
 use object_store::{GetOptions, GetResult, ObjectStore};
+use std::ops::Deref;
 use std::sync::Arc;
 use url::Url;
 
@@ -35,23 +36,17 @@ use url::Url;
 /// # Ok::<(), anyhow::Error>(())}).unwrap();
 /// # use {tokio::runtime::Runtime};
 /// ```
-pub struct ObjectPath<TObjectStore>
-where
-    TObjectStore: ObjectStore,
-{
+pub struct ObjectPath {
     /// An `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) cloud service, for example, Http, AWS S3,
     /// Azure, the local file system, etc.
-    pub object_store: Arc<TObjectStore>,
+    pub object_store: Arc<DynObjectStore>,
     /// A [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html) that points to a file on
     /// the [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
     /// that gives the path to the file on the cloud service.
     pub path: StorePath,
 }
 
-impl<TObjectStore> Clone for ObjectPath<TObjectStore>
-where
-    TObjectStore: ObjectStore,
-{
+impl Clone for ObjectPath {
     fn clone(&self) -> Self {
         ObjectPath {
             object_store: self.object_store.clone(),
@@ -65,7 +60,7 @@ where
 /// See ["Cloud URLs and `ObjectPath` Examples"](supplemental_document_cloud_urls/index.html) for examples.
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
-impl ObjectPath<Box<dyn ObjectStore>> {
+impl ObjectPath {
     /// Create a new [`ObjectPath`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
     /// See ["Cloud URLs and `ObjectPath` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
@@ -86,7 +81,7 @@ impl ObjectPath<Box<dyn ObjectStore>> {
         // cmk should we call this 'new'?
         location: S,
         options: I,
-    ) -> Result<ObjectPath<Box<dyn ObjectStore>>, anyhow::Error>
+    ) -> Result<ObjectPath, anyhow::Error>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str>,
@@ -97,7 +92,7 @@ impl ObjectPath<Box<dyn ObjectStore>> {
         let url =
             Url::parse(location).map_err(|e| anyhow!("Cannot parse url: {} {}", location, e))?;
 
-        let (object_store, store_path): (Box<dyn ObjectStore>, StorePath) =
+        let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
         let object_path = ObjectPath::new(Arc::new(object_store), store_path);
         Ok(object_path)
@@ -138,7 +133,7 @@ fn parse_work_around(url: &Url) -> Result<(bool, StorePath), object_store::Error
 pub fn parse_url_opts_work_around<I, K, V>(
     url: &Url,
     options: I,
-) -> Result<(Box<dyn ObjectStore>, StorePath), object_store::Error>
+) -> Result<(DynObjectStore, StorePath), object_store::Error>
 where
     I: IntoIterator<Item = (K, V)>,
     K: AsRef<str>,
@@ -155,17 +150,16 @@ where
                 Err(_) => builder,
             },
         );
-        let store = Box::new(builder.build()?) as _;
+        let store = DynObjectStore::new(Box::new(builder.build()?)) as _;
         Ok((store, path))
     } else {
-        object_store::parse_url_opts(url, options)
+        let (store, path) = object_store::parse_url_opts(url, options)?;
+        let store = DynObjectStore::new(store);
+        Ok((store, path))
     }
 }
 
-impl<TObjectStore> ObjectPath<TObjectStore>
-where
-    TObjectStore: ObjectStore,
-{
+impl ObjectPath {
     /// Create a new [`ObjectPath`] from an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
     ///
     /// Both parts must be owned, but see [`ObjectPath`] for examples of creating from a tuple with references.
@@ -185,7 +179,7 @@ where
     /// # Ok::<(), anyhow::Error>(())}).unwrap();
     /// # use {tokio::runtime::Runtime};
     /// ```
-    pub fn new(arc_object_store: Arc<TObjectStore>, path: StorePath) -> Self {
+    pub fn new(arc_object_store: Arc<DynObjectStore>, path: StorePath) -> Self {
         ObjectPath {
             object_store: arc_object_store,
             path,
@@ -269,11 +263,27 @@ where
     }
 }
 
-impl<TObjectStore> fmt::Display for ObjectPath<TObjectStore>
-where
-    TObjectStore: ObjectStore,
-{
+impl fmt::Display for ObjectPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ObjectPath: {:?}", self.path)
+    }
+}
+
+/// Newtype wrapping the `Box<dyn ObjectStore>` for easier usage
+#[derive(Debug)]
+pub struct DynObjectStore(Box<dyn ObjectStore>);
+
+// Implement Deref to allow access to the inner `ObjectStore` methods
+impl Deref for DynObjectStore {
+    type Target = dyn ObjectStore;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl DynObjectStore {
+    pub fn new(store: Box<dyn ObjectStore>) -> Self {
+        DynObjectStore(store)
     }
 }

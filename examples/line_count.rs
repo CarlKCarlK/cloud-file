@@ -1,13 +1,7 @@
 use futures_util::StreamExt;
 use object_path::{ObjectPath, EMPTY_OPTIONS};
-use object_store::ObjectStore;
 
-async fn count_lines<TObjectStore>(
-    object_path: &ObjectPath<TObjectStore>,
-) -> Result<usize, anyhow::Error>
-where
-    TObjectStore: ObjectStore,
-{
+async fn count_lines(object_path: &ObjectPath) -> Result<usize, anyhow::Error> {
     let mut stream = object_path.get().await?.into_stream();
     let mut newline_count: usize = 0;
     while let Some(bytes) = stream.next().await {

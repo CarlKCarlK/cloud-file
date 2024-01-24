@@ -3,16 +3,9 @@ use futures::pin_mut;
 use futures_util::StreamExt;
 use object_path::{ObjectPath, EMPTY_OPTIONS};
 use object_store::delimited::newline_delimited_stream;
-use object_store::ObjectStore;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-async fn random_line<TObjectStore>(
-    object_path: &ObjectPath<TObjectStore>,
-    seed: Option<u64>,
-) -> Result<String, anyhow::Error>
-where
-    TObjectStore: ObjectStore,
-{
+async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<String, anyhow::Error> {
     let mut rng = if let Some(s) = seed {
         StdRng::seed_from_u64(s)
     } else {
@@ -30,7 +23,8 @@ where
         let lines = std::str::from_utf8(&line_chunk)?.split_terminator('\n');
 
         for line in lines {
-            let index = index_iter.next().unwrap();
+            let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
+
             // Reservoir sampling: replace the selected line with probability 1/(index+1)
             if rng.gen_range(0..=index) == 0 {
                 selected_line = Some(line.to_string());
