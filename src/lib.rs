@@ -150,12 +150,11 @@ where
                 Err(_) => builder,
             },
         );
-        let store = DynObjectStore::new(Box::new(builder.build()?)) as _;
+        let store = DynObjectStore::new(builder.build()?);
         Ok((store, path))
     } else {
         let (store, path) = object_store::parse_url_opts(url, options)?;
-        let store = DynObjectStore::new(store);
-        Ok((store, path))
+        Ok((DynObjectStore(store), path))
     }
 }
 
@@ -283,7 +282,7 @@ impl Deref for DynObjectStore {
 }
 
 impl DynObjectStore {
-    pub fn new(store: Box<dyn ObjectStore>) -> Self {
-        DynObjectStore(store)
+    pub fn new<T: ObjectStore + 'static>(store: T) -> Self {
+        DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
 }
