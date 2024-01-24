@@ -1,5 +1,5 @@
 use futures_util::StreamExt;
-use object_path::ObjectPath;
+use object_path::{ObjectPath, EMPTY_OPTIONS};
 use object_store::ObjectStore;
 
 async fn count_lines<TObjectStore>(
@@ -19,13 +19,11 @@ where
     Ok(newline_count)
 }
 
-pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
-
 // cmk how can you test in memory with a URL?
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let object_path = ObjectPath::from_url(
-        "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/small.fam",
+        "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
         EMPTY_OPTIONS,
     )?;
     let line_count = count_lines(&object_path).await?;
