@@ -16,7 +16,7 @@ async fn count_lines(object_path: &ObjectPath) -> Result<usize, anyhow::Error> {
 // cmk how can you test in memory with a URL?
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let object_path = ObjectPath::from_url(
+    let object_path = ObjectPath::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
         EMPTY_OPTIONS,
     )?;

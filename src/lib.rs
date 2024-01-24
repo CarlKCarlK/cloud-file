@@ -39,18 +39,18 @@ use url::Url;
 pub struct ObjectPath {
     /// An `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) cloud service, for example, Http, AWS S3,
     /// Azure, the local file system, etc.
-    pub object_store: Arc<DynObjectStore>,
+    pub arc_object_store: Arc<DynObjectStore>,
     /// A [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html) that points to a file on
     /// the [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
     /// that gives the path to the file on the cloud service.
-    pub path: StorePath,
+    pub store_path: StorePath,
 }
 
 impl Clone for ObjectPath {
     fn clone(&self) -> Self {
         ObjectPath {
-            object_store: self.object_store.clone(),
-            path: self.path.clone(),
+            arc_object_store: self.arc_object_store.clone(),
+            store_path: self.store_path.clone(),
         }
     }
 }
@@ -77,7 +77,7 @@ impl ObjectPath {
     /// # Ok::<(), anyhow::Error>(())}).unwrap();
     /// # use {tokio::runtime::Runtime};
     /// ```
-    pub fn from_url<I, K, V, S>(
+    pub fn new<I, K, V, S>(
         // cmk should we call this 'new'?
         location: S,
         options: I,
@@ -94,7 +94,10 @@ impl ObjectPath {
 
         let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
-        let object_path = ObjectPath::new(Arc::new(object_store), store_path);
+        let object_path = ObjectPath {
+            arc_object_store: Arc::new(object_store),
+            store_path,
+        };
         Ok(object_path)
     }
 }
@@ -159,31 +162,32 @@ where
 }
 
 impl ObjectPath {
-    /// Create a new [`ObjectPath`] from an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
-    ///
-    /// Both parts must be owned, but see [`ObjectPath`] for examples of creating from a tuple with references.
-    ///
-    /// # Example
-    /// ```
-    /// use std::sync::Arc;
-    /// use object_store::{local::LocalFileSystem, path::Path as StorePath};
-    /// use bed_reader::{ObjectPath, BedErrorPlus, sample_bed_file};
-    /// # Runtime::new().unwrap().block_on(async {
-    /// let object_store = Arc::new(LocalFileSystem::new()); // Arc-wrapped ObjectStore
-    /// let file_path = sample_bed_file("plink_sim_10s_100v_10pmiss.bed")?; // regular Rust PathBuf
-    /// let store_path = StorePath::from_filesystem_path(&file_path)?; // StorePath
-    ///
-    /// let object_path: ObjectPath<_> = ObjectPath::new(object_store, store_path); // ObjectPath from owned values
-    /// assert_eq!(object_path.size().await?, 303);
-    /// # Ok::<(), anyhow::Error>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime};
-    /// ```
-    pub fn new(arc_object_store: Arc<DynObjectStore>, path: StorePath) -> Self {
-        ObjectPath {
-            object_store: arc_object_store,
-            path,
-        }
-    }
+    // delete cmk
+    // /// Create a new [`ObjectPath`] from an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
+    // ///
+    // /// Both parts must be owned, but see [`ObjectPath`] for examples of creating from a tuple with references.
+    // ///
+    // /// # Example
+    // /// ```
+    // /// use std::sync::Arc;
+    // /// use object_store::{local::LocalFileSystem, path::Path as StorePath};
+    // /// use bed_reader::{ObjectPath, BedErrorPlus, sample_bed_file};
+    // /// # Runtime::new().unwrap().block_on(async {
+    // /// let object_store = Arc::new(LocalFileSystem::new()); // Arc-wrapped ObjectStore
+    // /// let file_path = sample_bed_file("plink_sim_10s_100v_10pmiss.bed")?; // regular Rust PathBuf
+    // /// let store_path = StorePath::from_filesystem_path(&file_path)?; // StorePath
+    // ///
+    // /// let object_path: ObjectPath<_> = ObjectPath::new(object_store, store_path); // ObjectPath from owned values
+    // /// assert_eq!(object_path.size().await?, 303);
+    // /// # Ok::<(), anyhow::Error>(())}).unwrap();
+    // /// # use {tokio::runtime::Runtime};
+    // /// ```
+    // pub fn new(arc_object_store: Arc<DynObjectStore>, path: StorePath) -> Self {
+    //     ObjectPath {
+    //         object_store: arc_object_store,
+    //         path,
+    //     }
+    // }
 
     /// Return the size of a file stored in the cloud.
     ///
@@ -211,17 +215,23 @@ impl ObjectPath {
         &self,
         ranges: &[core::ops::Range<usize>],
     ) -> Result<Vec<Bytes>, anyhow::Error> {
-        Ok(self.object_store.get_ranges(&self.path, ranges).await?)
+        Ok(self
+            .arc_object_store
+            .get_ranges(&self.store_path, ranges)
+            .await?)
     }
 
     /// Perform a get request with options
     pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, anyhow::Error> {
-        Ok(self.object_store.get_opts(&self.path, get_options).await?)
+        Ok(self
+            .arc_object_store
+            .get_opts(&self.store_path, get_options)
+            .await?)
     }
 
     /// Return the bytes that are stored at the specified location.
     pub async fn get(&self) -> Result<GetResult, anyhow::Error> {
-        Ok(self.object_store.get(&self.path).await?)
+        Ok(self.arc_object_store.get(&self.store_path).await?)
     }
 
     /// Updates the [`ObjectPath`] to have the given extension.
@@ -242,7 +252,7 @@ impl ObjectPath {
     /// # use {tokio::runtime::Runtime, bed_reader::BedErrorPlus};
     /// ```
     pub fn set_extension(&mut self, extension: &str) -> Result<(), anyhow::Error> {
-        let mut path_str = self.path.to_string();
+        let mut path_str = self.store_path.to_string();
 
         // Find the last dot in the object path
         if let Some(dot_index) = path_str.rfind('.') {
@@ -257,14 +267,14 @@ impl ObjectPath {
         }
 
         // Parse the string back to StorePath
-        self.path = StorePath::parse(&path_str)?;
+        self.store_path = StorePath::parse(&path_str)?;
         Ok(())
     }
 }
 
 impl fmt::Display for ObjectPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ObjectPath: {:?}", self.path)
+        write!(f, "ObjectPath: {:?}", self.store_path)
     }
 }
 
