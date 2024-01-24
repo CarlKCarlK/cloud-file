@@ -4,6 +4,7 @@ use object_store::http::HttpBuilder;
 use object_store::path::Path as StorePath;
 use object_store::{GetOptions, GetResult, ObjectStore};
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
 use url::Url;
@@ -23,15 +24,11 @@ use url::Url;
 /// # Examples
 ///
 /// ```
-/// use std::sync::Arc;
-/// use object_store::{local::LocalFileSystem, path::Path as StorePath};
-/// use bed_reader::{ObjectPath, BedErrorPlus, sample_bed_file};
+/// use object_path::{ObjectPath, ObjectPathError, EMPTY_OPTIONS};
 ///
 /// # Runtime::new().unwrap().block_on(async {
-/// let arc_object_store = Arc::new(LocalFileSystem::new()); // Arc-wrapped ObjectStore
-/// let file_path = sample_bed_file("plink_sim_10s_100v_10pmiss.bed")?; // regular Rust PathBuf
-/// let store_path = StorePath::from_filesystem_path(&file_path)?; // StorePath
-/// let object_path = ObjectPath::new(arc_object_store, store_path); // ObjectPath
+/// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+/// let object_path = ObjectPath::new(&url, EMPTY_OPTIONS)?;
 /// assert_eq!(object_path.size().await?, 303);
 /// # Ok::<(), ObjectPathError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime};
@@ -60,6 +57,7 @@ impl Clone for ObjectPath {
 /// See ["Cloud URLs and `ObjectPath` Examples"](supplemental_document_cloud_urls/index.html) for examples.
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
+// cmk should there be new and new_ops?
 impl ObjectPath {
     /// Create a new [`ObjectPath`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
@@ -67,30 +65,28 @@ impl ObjectPath {
     ///
     /// # Example
     /// ```
-    /// use std::sync::Arc;
-    /// use object_store::{local::LocalFileSystem, path::Path as StorePath};
-    /// use bed_reader::{ObjectPath, BedErrorPlus, sample_bed_url, EMPTY_OPTIONS};
+    /// use object_path::{ObjectPath, ObjectPathError, EMPTY_OPTIONS};
+    ///
     /// # Runtime::new().unwrap().block_on(async {
-    /// let url: String = sample_bed_url("plink_sim_10s_100v_10pmiss.bed")?;
-    /// let object_path: ObjectPath<_> = ObjectPath::from_url(url, EMPTY_OPTIONS)?;
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
     /// assert_eq!(object_path.size().await?, 303);
     /// # Ok::<(), ObjectPathError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime};
     /// ```
-    pub fn new<I, K, V, S>(
+    pub fn new<I, K, V>(
         // cmk should we call this 'new'?
-        location: S,
+        location: impl AsRef<str>,
         options: I,
     ) -> Result<ObjectPath, ObjectPathError>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str>,
         V: Into<String>,
-        S: AsRef<str>,
     {
         let location = location.as_ref();
         let url = Url::parse(location)
-            .map_err(|e| ObjectPathError::UrlParseError(location.to_string(), e.to_string()))?;
+            .map_err(|e| ObjectPathError::CannotParseUrl(location.to_string(), e.to_string()))?;
 
         let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
@@ -193,18 +189,19 @@ impl ObjectPath {
     ///
     /// # Example
     /// ```
-    /// use bed_reader::{sample_bed_object_path};
+    /// use object_path::{ObjectPath, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
-    /// let mut object_path = sample_bed_object_path("plink_sim_10s_100v_10pmiss.bed")?;
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let object_path = ObjectPath::new(&url, EMPTY_OPTIONS)?;
     /// assert_eq!(object_path.size().await?, 303);
     /// # Ok::<(), ObjectPathError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime, bed_reader::BedErrorPlus};
+    /// # use {tokio::runtime::Runtime, object_path::ObjectPathError};
     /// ```
     pub async fn size(&self) -> Result<usize, ObjectPathError> {
         // cmk is this still needed?
         let get_result = self.get().await?;
-        // LATER: See if https://github.com/apache/arrow-rs/issues/5272 if fixed in
+        // CMK: See if https://github.com/apache/arrow-rs/issues/5272 if fixed in
         // a way so that only one read is needed.
         let object_meta = &get_result.meta;
         Ok(object_meta.size)
@@ -241,15 +238,15 @@ impl ObjectPath {
     ///
     /// # Example
     /// ```
-    /// use bed_reader::{sample_bed_object_path};
+    /// use object_path::{ObjectPath, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
-    /// let mut object_path = sample_bed_object_path("plink_sim_10s_100v_10pmiss.bed")?;
-    /// assert_eq!(object_path.size().await?, 303);
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let mut object_path = ObjectPath::new(&url, EMPTY_OPTIONS)?;
     /// object_path.set_extension("fam")?;
     /// assert_eq!(object_path.size().await?, 130);
     /// # Ok::<(), ObjectPathError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime, bed_reader::BedErrorPlus};
+    /// # use {tokio::runtime::Runtime, object_path::ObjectPathError};
     /// ```
     pub fn set_extension(&mut self, extension: &str) -> Result<(), ObjectPathError> {
         let mut path_str = self.store_path.to_string();
@@ -306,5 +303,67 @@ pub enum ObjectPathError {
     ObjectStorePathError(#[from] object_store::path::Error),
 
     #[error("Cannot parse URL: {0} {1}")]
-    UrlParseError(String, String),
+    CannotParseUrl(String, String),
+
+    #[allow(missing_docs)]
+    #[error("Cannot create URL from this absolute file path: '{0}'")]
+    CannotCreateUrlFromFilePath(String),
+}
+
+#[tokio::test]
+async fn object_path_2() -> Result<(), ObjectPathError> {
+    let object_path = ObjectPath::new(
+        "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed",
+        EMPTY_OPTIONS,
+    )?;
+    assert_eq!(object_path.size().await?, 303);
+    Ok(())
+}
+
+#[tokio::test]
+async fn object_path_extension() -> Result<(), ObjectPathError> {
+    let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    let mut object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
+    assert_eq!(object_path.size().await?, 303);
+    object_path.set_extension("fam")?;
+    assert_eq!(object_path.size().await?, 130);
+    Ok(())
+}
+
+// The AWS tests are skipped to credentials are not available.
+#[tokio::test]
+async fn s3_play_cloud() -> Result<(), ObjectPathError> {
+    use rusoto_credential::{CredentialsError, ProfileProvider, ProvideAwsCredentials};
+    let credentials = if let Ok(provider) = ProfileProvider::new() {
+        provider.credentials().await
+    } else {
+        Err(CredentialsError::new("No credentials found"))
+    };
+
+    let Ok(credentials) = credentials else {
+        eprintln!("Skipping test because no AWS credentials found");
+        return Ok(());
+    };
+
+    let url = "s3://bedreader/v1/toydata.5chrom.bed";
+    let options = [
+        ("aws_region", "us-west-2"),
+        ("aws_access_key_id", credentials.aws_access_key_id()),
+        ("aws_secret_access_key", credentials.aws_secret_access_key()),
+    ];
+
+    let object_path = ObjectPath::new(url, options)?;
+    assert_eq!(object_path.size().await?, 1_250_003);
+    Ok(())
+}
+
+/// Returns a local file's absolute path as a URL string, taking care of any needed encoding.
+pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, ObjectPathError> {
+    let path = path.as_ref();
+    let url = Url::from_file_path(path)
+        .map_err(|_e| {
+            ObjectPathError::CannotCreateUrlFromFilePath(path.to_string_lossy().to_string())
+        })?
+        .to_string();
+    Ok(url)
 }
