@@ -25,7 +25,7 @@ async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<Stri
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
 
-            // Reservoir sampling: replace the selected line with probability 1/(index+1)
+            // cmk: see article for explanation of this algorithm
             if rng.gen_range(0..=index) == 0 {
                 selected_line = Some(line.to_string());
             }
@@ -35,7 +35,6 @@ async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<Stri
     selected_line.ok_or_else(|| anyhow!("No lines found in the file"))
 }
 
-// cmk how can you test in memory with a URL?
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let object_path = ObjectPath::new(

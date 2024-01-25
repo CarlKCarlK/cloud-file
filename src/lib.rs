@@ -1,9 +1,17 @@
+// cmk need README.md etc.
+// cmk set up the warnings for missing docs, etc
+// cmk add 64-bit test
+// cmk how can docs reference examples?
+// cmk make an example (and/or a method) for random region reading.
+// cmk limitations: no writing, no directories, no in-memory support, a bit-less efficient than generics,
+// cmk limitations: no option of which services, makes non-url usage awkward.
 use bytes::Bytes;
 use core::fmt;
+use futures_util::TryStreamExt;
 use object_store::http::HttpBuilder;
 use object_store::path::Path as StorePath;
 use object_store::{GetOptions, GetResult, ObjectStore};
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -12,6 +20,7 @@ use url::Url;
 #[derive(Debug)]
 /// The location of a file in the cloud.
 ///
+/// cmk change ObjectStore to DynObjectStore
 /// The location is made up of of two parts, an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
 /// and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
 /// The [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) is a cloud service, for example, Http, AWS S3, Azure,
@@ -20,6 +29,7 @@ use url::Url;
 /// See ["Cloud URLs and `ObjectPath` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
 ///
 /// An `ObjectPath` can be efficiently cloned because the `ObjectStore` is `Arc`-wrapped.
+/// /// cmk change ObjectStore to DynObjectStore
 ///
 /// # Examples
 ///
@@ -34,6 +44,7 @@ use url::Url;
 /// # use {tokio::runtime::Runtime};
 /// ```
 pub struct ObjectPath {
+    /// cmk change ObjectStore to DynObjectStore
     /// An `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) cloud service, for example, Http, AWS S3,
     /// Azure, the local file system, etc.
     pub arc_object_store: Arc<DynObjectStore>,
@@ -52,12 +63,12 @@ impl Clone for ObjectPath {
     }
 }
 
+// cmk update reference
 /// An empty set of [cloud options](supplemental_document_options/index.html#cloud-options)
 ///
 /// See ["Cloud URLs and `ObjectPath` Examples"](supplemental_document_cloud_urls/index.html) for examples.
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
-// cmk should there be new and new_ops?
 impl ObjectPath {
     /// Create a new [`ObjectPath`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
@@ -75,7 +86,6 @@ impl ObjectPath {
     /// # use {tokio::runtime::Runtime};
     /// ```
     pub fn new<I, K, V>(
-        // cmk should we call this 'new'?
         location: impl AsRef<str>,
         options: I,
     ) -> Result<ObjectPath, ObjectPathError>
@@ -96,94 +106,20 @@ impl ObjectPath {
         };
         Ok(object_path)
     }
-}
 
-#[allow(clippy::match_bool)]
-fn parse_work_around(url: &Url) -> Result<(bool, StorePath), object_store::Error> {
-    let strip_bucket = || Some(url.path().strip_prefix('/')?.split_once('/')?.1);
+    /// cmk create docs
+    pub async fn line_count(&self) -> Result<usize, ObjectPathError> {
+        let stream = self.get().await?.into_stream();
 
-    let (scheme, path) = match (url.scheme(), url.host_str()) {
-        ("http", Some(_)) => (true, url.path()),
-        ("https", Some(host)) => {
-            if host.ends_with("dfs.core.windows.net")
-                || host.ends_with("blob.core.windows.net")
-                || host.ends_with("dfs.fabric.microsoft.com")
-                || host.ends_with("blob.fabric.microsoft.com")
-            {
-                (false, url.path())
-            } else if host.ends_with("amazonaws.com") {
-                match host.starts_with("s3") {
-                    true => (false, strip_bucket().unwrap_or_default()),
-                    false => (false, url.path()),
-                }
-            } else if host.ends_with("r2.cloudflarestorage.com") {
-                (false, strip_bucket().unwrap_or_default())
-            } else {
-                (true, url.path())
-            }
-        }
-        _ => (false, url.path()),
-    };
-
-    Ok((scheme, StorePath::from_url_path(path)?))
-}
-
-// LATER when https://github.com/apache/arrow-rs/issues/5310 gets fixed, can remove work around
-pub fn parse_url_opts_work_around<I, K, V>(
-    url: &Url,
-    options: I,
-) -> Result<(DynObjectStore, StorePath), object_store::Error>
-where
-    I: IntoIterator<Item = (K, V)>,
-    K: AsRef<str>,
-    V: Into<String>,
-{
-    let (is_http, path) = parse_work_around(url)?;
-    if is_http {
-        let url = &url[..url::Position::BeforePath];
-        let path = StorePath::parse(path)?;
-        let builder = options.into_iter().fold(
-            <HttpBuilder>::new().with_url(url),
-            |builder, (key, value)| match key.as_ref().parse() {
-                Ok(k) => builder.with_config(k, value),
-                Err(_) => builder,
-            },
-        );
-        let store = DynObjectStore::new(builder.build()?);
-        Ok((store, path))
-    } else {
-        let (store, path) = object_store::parse_url_opts(url, options)?;
-        Ok((DynObjectStore(store), path))
+        let newline_count = stream
+            .try_fold(0, |acc, bytes| async move {
+                let count = bytecount::count(&bytes, b'\n');
+                Ok(acc + count) // Accumulate the count
+            })
+            .await
+            .map_err(ObjectPathError::ObjectStoreError)?;
+        Ok(newline_count)
     }
-}
-
-impl ObjectPath {
-    // delete cmk
-    // /// Create a new [`ObjectPath`] from an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
-    // ///
-    // /// Both parts must be owned, but see [`ObjectPath`] for examples of creating from a tuple with references.
-    // ///
-    // /// # Example
-    // /// ```
-    // /// use std::sync::Arc;
-    // /// use object_store::{local::LocalFileSystem, path::Path as StorePath};
-    // /// use bed_reader::{ObjectPath, BedErrorPlus, sample_bed_file};
-    // /// # Runtime::new().unwrap().block_on(async {
-    // /// let object_store = Arc::new(LocalFileSystem::new()); // Arc-wrapped ObjectStore
-    // /// let file_path = sample_bed_file("plink_sim_10s_100v_10pmiss.bed")?; // regular Rust PathBuf
-    // /// let store_path = StorePath::from_filesystem_path(&file_path)?; // StorePath
-    // ///
-    // /// let object_path: ObjectPath<_> = ObjectPath::new(object_store, store_path); // ObjectPath from owned values
-    // /// assert_eq!(object_path.size().await?, 303);
-    // /// # Ok::<(), ObjectPathError>(())}).unwrap();
-    // /// # use {tokio::runtime::Runtime};
-    // /// ```
-    // pub fn new(arc_object_store: Arc<DynObjectStore>, path: StorePath) -> Self {
-    //     ObjectPath {
-    //         object_store: arc_object_store,
-    //         path,
-    //     }
-    // }
 
     /// Return the size of a file stored in the cloud.
     ///
@@ -199,19 +135,15 @@ impl ObjectPath {
     /// # use {tokio::runtime::Runtime, object_path::ObjectPathError};
     /// ```
     pub async fn size(&self) -> Result<usize, ObjectPathError> {
-        // cmk is this still needed?
+        // cmk should use .head -- also anywhere I think I'm getting size, I should be sure head is true.
         let get_result = self.get().await?;
-        // CMK: See if https://github.com/apache/arrow-rs/issues/5272 if fixed in
-        // a way so that only one read is needed.
         let object_meta = &get_result.meta;
         Ok(object_meta.size)
     }
 
-    /// Return the bytes that are stored at the specified location in the given byte ranges
-    pub async fn get_ranges(
-        &self,
-        ranges: &[core::ops::Range<usize>],
-    ) -> Result<Vec<Bytes>, ObjectPathError> {
+    /// cmk need an example
+    /// Return the bytes that are stored at the specified location(s) in the given byte ranges
+    pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, ObjectPathError> {
         Ok(self
             .arc_object_store
             .get_ranges(&self.store_path, ranges)
@@ -219,6 +151,7 @@ impl ObjectPath {
     }
 
     /// Perform a get request with options
+    /// cmk need an example
     pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, ObjectPathError> {
         Ok(self
             .arc_object_store
@@ -227,14 +160,18 @@ impl ObjectPath {
     }
 
     /// Return the bytes that are stored at the specified location.
+    /// cmk need an example
     pub async fn get(&self) -> Result<GetResult, ObjectPathError> {
         Ok(self.arc_object_store.get(&self.store_path).await?)
     }
 
-    /// Updates the [`ObjectPath`] to have the given extension.
+    /// Updates the [`ObjectPath`] in place to have the given extension.
     ///
     /// It removes the current extension, if any.
     /// It appends the given extension, if any.
+    ///
+    /// The method is in-place rather than functional to make it consistent with
+    /// [`std::path::PathBuf::set_extension`](https://doc.rust-lang.org/stable/std/path/struct.PathBuf.html#method.set_extension).
     ///
     /// # Example
     /// ```
@@ -269,13 +206,72 @@ impl ObjectPath {
     }
 }
 
+#[allow(clippy::match_bool)]
+fn parse_work_around(url: &Url) -> Result<(bool, StorePath), object_store::Error> {
+    let strip_bucket = || Some(url.path().strip_prefix('/')?.split_once('/')?.1);
+
+    let (scheme, path) = match (url.scheme(), url.host_str()) {
+        ("http", Some(_)) => (true, url.path()),
+        ("https", Some(host)) => {
+            if host.ends_with("dfs.core.windows.net")
+                || host.ends_with("blob.core.windows.net")
+                || host.ends_with("dfs.fabric.microsoft.com")
+                || host.ends_with("blob.fabric.microsoft.com")
+            {
+                (false, url.path())
+            } else if host.ends_with("amazonaws.com") {
+                match host.starts_with("s3") {
+                    true => (false, strip_bucket().unwrap_or_default()),
+                    false => (false, url.path()),
+                }
+            } else if host.ends_with("r2.cloudflarestorage.com") {
+                (false, strip_bucket().unwrap_or_default())
+            } else {
+                (true, url.path())
+            }
+        }
+        _ => (false, url.path()),
+    };
+
+    Ok((scheme, StorePath::from_url_path(path)?))
+}
+
+// LATER when https://github.com/apache/arrow-rs/issues/5310 gets fixed, can remove work around
+fn parse_url_opts_work_around<I, K, V>(
+    url: &Url,
+    options: I,
+) -> Result<(DynObjectStore, StorePath), object_store::Error>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: AsRef<str>,
+    V: Into<String>,
+{
+    let (is_http, path) = parse_work_around(url)?;
+    if is_http {
+        let url = &url[..url::Position::BeforePath];
+        let path = StorePath::parse(path)?;
+        let builder = options.into_iter().fold(
+            <HttpBuilder>::new().with_url(url),
+            |builder, (key, value)| match key.as_ref().parse() {
+                Ok(k) => builder.with_config(k, value),
+                Err(_) => builder,
+            },
+        );
+        let store = DynObjectStore::new(builder.build()?);
+        Ok((store, path))
+    } else {
+        let (store, path) = object_store::parse_url_opts(url, options)?;
+        Ok((DynObjectStore(store), path))
+    }
+}
+
 impl fmt::Display for ObjectPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ObjectPath: {:?}", self.store_path)
     }
 }
 
-/// Newtype wrapping the `Box<dyn ObjectStore>` for easier usage
+/// Wraps `Box<dyn ObjectStore>` for easier usage
 #[derive(Debug)]
 pub struct DynObjectStore(Box<dyn ObjectStore>);
 
@@ -367,3 +363,26 @@ pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, ObjectPa
         .to_string();
     Ok(url)
 }
+
+// cmk understand these
+// // Fetch just the file metadata
+// let meta = object_store.head(&path).await.unwrap();
+// println!("{meta:?}");
+//
+// // Fetch the object including metadata
+// let result: GetResult = object_store.get(&path).await.unwrap();
+// assert_eq!(result.meta, meta);
+//
+// // Buffer the entire object in memory
+// let object: Bytes = result.bytes().await.unwrap();
+// assert_eq!(object.len(), meta.size);
+//
+// // Alternatively stream the bytes from object storage
+// let stream = object_store.get(&path).await.unwrap().into_stream();
+//
+// // Count the '0's using `try_fold` from `TryStreamExt` trait
+// let num_zeros = stream
+//     .try_fold(0, |acc, bytes| async move {
+//         Ok(acc + bytes.iter().filter(|b| **b == 0).count())
+//     }).await.unwrap();
+//
