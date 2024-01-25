@@ -135,10 +135,8 @@ impl ObjectPath {
     /// # use {tokio::runtime::Runtime, object_path::ObjectPathError};
     /// ```
     pub async fn size(&self) -> Result<usize, ObjectPathError> {
-        // cmk should use .head -- also anywhere I think I'm getting size, I should be sure head is true.
-        let get_result = self.get().await?;
-        let object_meta = &get_result.meta;
-        Ok(object_meta.size)
+        let meta = self.arc_object_store.head(&self.store_path).await?;
+        Ok(meta.size)
     }
 
     /// cmk need an example
