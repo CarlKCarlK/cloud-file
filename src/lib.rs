@@ -34,24 +34,24 @@ use url::Url;
 /// The [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) is a cloud service, for example, Http, AWS S3, Azure,
 /// the local file system, etc. The `StorePath` is the path to the file on the cloud service.
 ///
-/// See ["Cloud URLs and `CloudFiles` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
+/// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
 ///
-/// An `CloudFiles` can be efficiently cloned because the `ObjectStore` is `Arc`-wrapped.
+/// An `CloudFile` can be efficiently cloned because the `ObjectStore` is `Arc`-wrapped.
 /// /// cmk change ObjectStore to DynObjectStore
 ///
 /// # Examples
 ///
 /// ```
-/// use cloud_files::{CloudFiles, CloudFilesError, EMPTY_OPTIONS};
+/// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
 ///
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-/// let cloud_files = CloudFiles::new(&url, EMPTY_OPTIONS)?;
-/// assert_eq!(cloud_files.size().await?, 303);
-/// # Ok::<(), CloudFilesError>(())}).unwrap();
+/// let cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+/// assert_eq!(cloud_file.size().await?, 303);
+/// # Ok::<(), CloudFileError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime};
 /// ```
-pub struct CloudFiles {
+pub struct CloudFile {
     /// cmk change ObjectStore to DynObjectStore
     /// An `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) cloud service, for example, Http, AWS S3,
     /// Azure, the local file system, etc.
@@ -62,9 +62,9 @@ pub struct CloudFiles {
     pub store_path: StorePath,
 }
 
-impl Clone for CloudFiles {
+impl Clone for CloudFile {
     fn clone(&self) -> Self {
-        CloudFiles {
+        CloudFile {
             arc_object_store: self.arc_object_store.clone(),
             store_path: self.store_path.clone(),
         }
@@ -74,29 +74,26 @@ impl Clone for CloudFiles {
 // cmk update reference
 /// An empty set of [cloud options](supplemental_document_options/index.html#cloud-options)
 ///
-/// See ["Cloud URLs and `CloudFiles` Examples"](supplemental_document_cloud_urls/index.html) for examples.
+/// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for examples.
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
-impl CloudFiles {
-    /// Create a new [`CloudFiles`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
+impl CloudFile {
+    /// Create a new [`CloudFile`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
-    /// See ["Cloud URLs and `CloudFiles` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
+    /// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
     ///
     /// # Example
     /// ```
-    /// use cloud_files::{CloudFiles, CloudFilesError, EMPTY_OPTIONS};
+    /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_files = CloudFiles::new(url, EMPTY_OPTIONS)?;
-    /// assert_eq!(cloud_files.size().await?, 303);
-    /// # Ok::<(), CloudFilesError>(())}).unwrap();
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// assert_eq!(cloud_file.size().await?, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime};
     /// ```
-    pub fn new<I, K, V>(
-        location: impl AsRef<str>,
-        options: I,
-    ) -> Result<CloudFiles, CloudFilesError>
+    pub fn new<I, K, V>(location: impl AsRef<str>, options: I) -> Result<CloudFile, CloudFileError>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str>,
@@ -104,19 +101,19 @@ impl CloudFiles {
     {
         let location = location.as_ref();
         let url = Url::parse(location)
-            .map_err(|e| CloudFilesError::CannotParseUrl(location.to_string(), e.to_string()))?;
+            .map_err(|e| CloudFileError::CannotParseUrl(location.to_string(), e.to_string()))?;
 
         let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
-        let cloud_files = CloudFiles {
+        let cloud_file = CloudFile {
             arc_object_store: Arc::new(object_store),
             store_path,
         };
-        Ok(cloud_files)
+        Ok(cloud_file)
     }
 
     /// cmk create docs
-    pub async fn line_count(&self) -> Result<usize, CloudFilesError> {
+    pub async fn line_count(&self) -> Result<usize, CloudFileError> {
         let stream = self.get().await?.into_stream();
 
         let newline_count = stream
@@ -125,7 +122,7 @@ impl CloudFiles {
                 Ok(acc + count) // Accumulate the count
             })
             .await
-            .map_err(CloudFilesError::ObjectStoreError)?;
+            .map_err(CloudFileError::ObjectStoreError)?;
         Ok(newline_count)
     }
 
@@ -133,23 +130,23 @@ impl CloudFiles {
     ///
     /// # Example
     /// ```
-    /// use cloud_files::{CloudFiles, EMPTY_OPTIONS};
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_files = CloudFiles::new(&url, EMPTY_OPTIONS)?;
-    /// assert_eq!(cloud_files.size().await?, 303);
-    /// # Ok::<(), CloudFilesError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime, cloud_files::CloudFilesError};
+    /// let cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+    /// assert_eq!(cloud_file.size().await?, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn size(&self) -> Result<usize, CloudFilesError> {
+    pub async fn size(&self) -> Result<usize, CloudFileError> {
         let meta = self.arc_object_store.head(&self.store_path).await?;
         Ok(meta.size)
     }
 
     /// cmk need an example
     /// Return the bytes that are stored at the specified location(s) in the given byte ranges
-    pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFilesError> {
+    pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
         Ok(self
             .arc_object_store
             .get_ranges(&self.store_path, ranges)
@@ -158,7 +155,7 @@ impl CloudFiles {
 
     /// Perform a get request with options
     /// cmk need an example
-    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFilesError> {
+    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFileError> {
         Ok(self
             .arc_object_store
             .get_opts(&self.store_path, get_options)
@@ -167,11 +164,11 @@ impl CloudFiles {
 
     /// Return the bytes that are stored at the specified location.
     /// cmk need an example
-    pub async fn get(&self) -> Result<GetResult, CloudFilesError> {
+    pub async fn get(&self) -> Result<GetResult, CloudFileError> {
         Ok(self.arc_object_store.get(&self.store_path).await?)
     }
 
-    /// Updates the [`CloudFiles`] in place to have the given extension.
+    /// Updates the [`CloudFile`] in place to have the given extension.
     ///
     /// It removes the current extension, if any.
     /// It appends the given extension, if any.
@@ -181,17 +178,17 @@ impl CloudFiles {
     ///
     /// # Example
     /// ```
-    /// use cloud_files::{CloudFiles, EMPTY_OPTIONS};
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let mut cloud_files = CloudFiles::new(&url, EMPTY_OPTIONS)?;
-    /// cloud_files.set_extension("fam")?;
-    /// assert_eq!(cloud_files.size().await?, 130);
-    /// # Ok::<(), CloudFilesError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime, cloud_files::CloudFilesError};
+    /// let mut cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+    /// cloud_file.set_extension("fam")?;
+    /// assert_eq!(cloud_file.size().await?, 130);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub fn set_extension(&mut self, extension: &str) -> Result<(), CloudFilesError> {
+    pub fn set_extension(&mut self, extension: &str) -> Result<(), CloudFileError> {
         let mut path_str = self.store_path.to_string();
 
         // Find the last dot in the object path
@@ -271,9 +268,9 @@ where
     }
 }
 
-impl fmt::Display for CloudFiles {
+impl fmt::Display for CloudFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CloudFiles: {:?}", self.store_path)
+        write!(f, "CloudFile: {:?}", self.store_path)
     }
 }
 
@@ -297,7 +294,7 @@ impl DynObjectStore {
 }
 
 #[derive(Error, Debug)]
-pub enum CloudFilesError {
+pub enum CloudFileError {
     #[error("Object store error: {0}")]
     ObjectStoreError(#[from] object_store::Error),
 
@@ -313,28 +310,28 @@ pub enum CloudFilesError {
 }
 
 #[tokio::test]
-async fn cloud_files_2() -> Result<(), CloudFilesError> {
-    let cloud_files = CloudFiles::new(
+async fn cloud_file_2() -> Result<(), CloudFileError> {
+    let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed",
         EMPTY_OPTIONS,
     )?;
-    assert_eq!(cloud_files.size().await?, 303);
+    assert_eq!(cloud_file.size().await?, 303);
     Ok(())
 }
 
 #[tokio::test]
-async fn cloud_files_extension() -> Result<(), CloudFilesError> {
+async fn cloud_file_extension() -> Result<(), CloudFileError> {
     let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    let mut cloud_files = CloudFiles::new(url, EMPTY_OPTIONS)?;
-    assert_eq!(cloud_files.size().await?, 303);
-    cloud_files.set_extension("fam")?;
-    assert_eq!(cloud_files.size().await?, 130);
+    let mut cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    assert_eq!(cloud_file.size().await?, 303);
+    cloud_file.set_extension("fam")?;
+    assert_eq!(cloud_file.size().await?, 130);
     Ok(())
 }
 
 // The AWS tests are skipped to credentials are not available.
 #[tokio::test]
-async fn s3_play_cloud() -> Result<(), CloudFilesError> {
+async fn s3_play_cloud() -> Result<(), CloudFileError> {
     use rusoto_credential::{CredentialsError, ProfileProvider, ProvideAwsCredentials};
     let credentials = if let Ok(provider) = ProfileProvider::new() {
         provider.credentials().await
@@ -354,17 +351,17 @@ async fn s3_play_cloud() -> Result<(), CloudFilesError> {
         ("aws_secret_access_key", credentials.aws_secret_access_key()),
     ];
 
-    let cloud_files = CloudFiles::new(url, options)?;
-    assert_eq!(cloud_files.size().await?, 1_250_003);
+    let cloud_file = CloudFile::new(url, options)?;
+    assert_eq!(cloud_file.size().await?, 1_250_003);
     Ok(())
 }
 
 /// Returns a local file's absolute path as a URL string, taking care of any needed encoding.
-pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFilesError> {
+pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFileError> {
     let path = path.as_ref();
     let url = Url::from_file_path(path)
         .map_err(|_e| {
-            CloudFilesError::CannotCreateUrlFromFilePath(path.to_string_lossy().to_string())
+            CloudFileError::CannotCreateUrlFromFilePath(path.to_string_lossy().to_string())
         })?
         .to_string();
     Ok(url)
@@ -379,8 +376,8 @@ fn readme_1() {
         .unwrap()
         .block_on(async {
             let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-            let cloud_files = CloudFiles::new(url,EMPTY_OPTIONS)?;
-            let mut stream = cloud_files.get().await?.into_stream();
+            let cloud_file = CloudFile::new(url,EMPTY_OPTIONS)?;
+            let mut stream = cloud_file.get().await?.into_stream();
             let mut newline_count: usize = 0;
             while let Some(bytes) = stream.next().await {
                 let bytes = bytes?;
@@ -388,7 +385,7 @@ fn readme_1() {
                 newline_count += count;
             }
             assert_eq!(newline_count, 500);
-            Ok::<(), CloudFilesError>(())
+            Ok::<(), CloudFileError>(())
         })
         .unwrap();
 }

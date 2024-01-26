@@ -1,8 +1,8 @@
-use cloud_files::{CloudFiles, CloudFilesError, EMPTY_OPTIONS};
+use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
 use futures_util::StreamExt;
 
-async fn count_lines(cloud_files: &CloudFiles) -> Result<usize, CloudFilesError> {
-    let mut stream = cloud_files.get().await?.into_stream();
+async fn count_lines(cloud_file: &CloudFile) -> Result<usize, CloudFileError> {
+    let mut stream = cloud_file.get().await?.into_stream();
     let mut newline_count: usize = 0;
     while let Some(bytes) = stream.next().await {
         let bytes = bytes?;
@@ -14,12 +14,12 @@ async fn count_lines(cloud_files: &CloudFiles) -> Result<usize, CloudFilesError>
 }
 
 #[tokio::main]
-async fn main() -> Result<(), CloudFilesError> {
-    let cloud_files = CloudFiles::new(
+async fn main() -> Result<(), CloudFileError> {
+    let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
         EMPTY_OPTIONS,
     )?;
-    let line_count = count_lines(&cloud_files).await?;
+    let line_count = count_lines(&cloud_file).await?;
     println!("line_count: {}", line_count);
     Ok(())
 }

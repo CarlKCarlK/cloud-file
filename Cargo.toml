@@ -1,16 +1,16 @@
 [package]
-name = "cloud-files"
+name = "cloud-file"
 version = "0.1.0"
 edition = "2021"
 description = "Simple reading of files in the cloud."
-repository = "https://github.com/CarlKCarlK/cloud-files"
+repository = "https://github.com/CarlKCarlK/cloud-file"
 readme = "README.md"
-documentation = "https://docs.rs/cloud-files/latest/cloud-files/"
+documentation = "https://docs.rs/cloud-file/latest/cloud-file/"
 authors = ["Carl Kadie"]
 license = "MIT OR Apache-2.0"
 keywords = ["cmkset", "range", "data-structures", "no_std", "wasm"]
 categories = ["cmkdata-structures", "no-std", "wasm"]
-homepage = "https://github.com/CarlKCarlK/cloud-files"
+homepage = "https://github.com/CarlKCarlK/cloud-file"
 
 
 [dependencies]
