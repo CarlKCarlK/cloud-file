@@ -1,61 +1,93 @@
-use std::{collections::HashMap, ops::Range};
-
 use futures::pin_mut;
 use futures_util::StreamExt;
-use object_path::{abs_path_to_url_string, ObjectPath, EMPTY_OPTIONS};
+use object_path::ObjectPath;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::{cmp::max, collections::HashMap, ops::Range};
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
-    // let object_path = ObjectPath::new(
-    //     "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
-    //     EMPTY_OPTIONS,
-    // )?;
-    let file_name = r"C:\Users\carlk\OneDrive\programs\bed-sample-files\toydata.5chrom.fam";
-    let url = abs_path_to_url_string(file_name)?;
-    let object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
-    let size = object_path.size().await?;
-    let seed = Some(0u64);
-    let n = 1_000;
-    let chunk_count = 100;
-    let max_concurrent_requests = 10;
-
+async fn count_bigrams(
+    object_path: ObjectPath,
+    sample_count: usize,
+    seed: Option<u64>,
+    max_concurrent_requests: usize,
+    max_chunk_bytes: usize,
+) -> Result<(), anyhow::Error> {
+    // Create a random number generator
     let mut rng = if let Some(s) = seed {
         StdRng::seed_from_u64(s)
     } else {
         StdRng::from_entropy()
     };
-    let ranges: Vec<Range<usize>> = (0..n)
-        .map(|_| rng.gen_range(0..size - 1)) // First map to generate the random start
-        .map(|start| start..start + 2) // Second map to create the tuple range
-        .collect();
-    // println!("region_list: {:?}", ranges);
 
-    let chunks = ranges.chunks(chunk_count);
-    let iterator = chunks.map(|chunk| {
-        let object_path = object_path.clone();
+    // Find the document size and then choose the two-byte ranges to sample
+    let size = object_path.size().await?;
+    let range_samples: Vec<Range<usize>> = (0..sample_count)
+        .map(|_| rng.gen_range(0..size - 1))
+        .map(|start| start..start + 2)
+        .collect();
+
+    // Divide the ranges into chunks respecting the max_chunk_bytes limit
+    const BYTES_PER_BIGRAM: usize = 2;
+    let chunk_count = max(1, max_chunk_bytes / BYTES_PER_BIGRAM);
+    let range_chunks = range_samples.chunks(chunk_count);
+
+    // Create an iterator of future work
+    let work_chunks_iterator = range_chunks.map(|chunk| {
+        let object_path = object_path.clone(); // by design, clone is cheap
         async move { object_path.get_ranges(chunk).await }
     });
 
-    let stream = futures_util::stream::iter(iterator).buffer_unordered(max_concurrent_requests);
-    pin_mut!(stream);
+    // Create a stream of futures to run out-of-order and with limited concurrency.
+    let work_chunks_stream =
+        futures_util::stream::iter(work_chunks_iterator).buffer_unordered(max_concurrent_requests);
+    pin_mut!(work_chunks_stream);
 
+    // Run the futures and, as result bytes come in, tabulate.
     let mut bigram_counts = HashMap::new();
-    while let Some(result) = stream.next().await {
-        let bytes = result?;
-        for b in bytes.iter() {
-            let bigram = (b[0], b[1]);
+    while let Some(result) = work_chunks_stream.next().await {
+        let bytes_vec = result?;
+        for bytes in bytes_vec.iter() {
+            let bigram = (bytes[0], bytes[1]);
             let count = bigram_counts.entry(bigram).or_insert(0);
             *count += 1;
         }
     }
 
-    let mut bigram_count_vec: Vec<((u8, u8), usize)> = bigram_counts.into_iter().collect();
+    // Sort the bigrams by count and print the top 10
+    let mut bigram_count_vec: Vec<(_, usize)> = bigram_counts.into_iter().collect();
     bigram_count_vec.sort_by(|a, b| b.1.cmp(&a.1));
     for (bigram, count) in bigram_count_vec.into_iter().take(10) {
-        let char1 = (bigram.0 as char).escape_default();
-        let char2 = (bigram.1 as char).escape_default();
-        println!("Bigram ('{}{}') occurs {} times", char1, char2, count);
+        let char0 = (bigram.0 as char).escape_default();
+        let char1 = (bigram.1 as char).escape_default();
+        println!("Bigram ('{}{}') occurs {} times", char0, char1, count);
     }
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    // use object_path::{abs_path_to_url_string, EMPTY_OPTIONS};
+    // let file_name = r"C:\Users\carlk\OneDrive\programs\bed-sample-files\toydata.5chrom.fam";
+    // let url = abs_path_to_url_string(file_name)?;
+    // let object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
+
+    let object_path = ObjectPath::new(
+        "https://www.gutenberg.org/cache/epub/100/pg100.txt",
+        [("timeout", "30s")],
+    )?;
+
+    let seed = Some(0u64);
+    let sample_count = 10_000;
+    let max_chunk_bytes = 500; // 8_000_000 is a good default
+    let max_concurrent_requests = 10; // 10 is a good default
+
+    count_bigrams(
+        object_path,
+        sample_count,
+        seed,
+        max_concurrent_requests,
+        max_chunk_bytes,
+    )
+    .await?;
+
     Ok(())
 }
