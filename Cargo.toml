@@ -2,11 +2,21 @@
 name = "object-path"
 version = "0.1.0"
 edition = "2021"
+description = "Simple reading of files in the cloud."
+repository = "https://github.com/CarlKCarlK/object-path"
+readme = "README.md"
+documentation = "https://docs.rs/object-path/latest/object-path/"
+authors = ["Carl Kadie"]
+license = "MIT OR Apache-2.0"
+keywords = ["cmkset", "range", "data-structures", "no_std", "wasm"]
+categories = ["cmkdata-structures", "no-std", "wasm"]
+homepage = "https://github.com/CarlKCarlK/object-path"
+
 
 [dependencies]
-futures = "0.3.30"
 # when object_store goes to 0.9.1 check if can remove http cloud options work around code.
 object_store = { version = "0.9.0", features = ["http", "aws", "azure", "gcp"] }
+futures = "0.3.30"
 tokio = { version = "1.35.0", features = ["full"]}
 bytecount = "0.6.7"
 bytes = "1.5.0"

@@ -1,10 +1,18 @@
-// cmk need README.md etc.
-// cmk set up the warnings for missing docs, etc
-// cmk add 64-bit test
-// cmk how can docs reference examples?
-// cmk make an example (and/or a method) for random region reading.
-// cmk limitations: no writing, no directories, no in-memory support, a bit-less efficient than generics,
-// cmk limitations: no option of which services, makes non-url usage awkward.
+#![warn(missing_docs)]
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::missing_panics_doc, // LATER: add panics docs
+    clippy::missing_errors_doc, // LATER: add errors docs
+    clippy::similar_names,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless
+)]
+#![doc = include_str!("../README.md")]
+//! ## Main Functions cmk
+// cmk like bed-reader, but with links to examples and maybe supplemental doc
+
 use bytes::Bytes;
 use core::fmt;
 use futures_util::TryStreamExt;
@@ -18,7 +26,7 @@ use thiserror::Error;
 use url::Url;
 
 #[derive(Debug)]
-/// The location of a file in the cloud.
+/// The main struct representing the location of a file in the cloud.
 ///
 /// cmk change ObjectStore to DynObjectStore
 /// The location is made up of of two parts, an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
@@ -362,6 +370,29 @@ pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, ObjectPa
     Ok(url)
 }
 
+#[test]
+fn readme_1() {
+    use futures_util::StreamExt;
+    use tokio::runtime::Runtime;
+
+    Runtime::new()
+        .unwrap()
+        .block_on(async {
+            let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+            let object_path = ObjectPath::new(url,EMPTY_OPTIONS)?;
+            let mut stream = object_path.get().await?.into_stream();
+            let mut newline_count: usize = 0;
+            while let Some(bytes) = stream.next().await {
+                let bytes = bytes?;
+                let count = bytecount::count(&bytes, b'\n');
+                newline_count += count;
+            }
+            assert_eq!(newline_count, 500);
+            Ok::<(), ObjectPathError>(())
+        })
+        .unwrap();
+}
+
 // cmk understand these
 // // Fetch just the file metadata
 // let meta = object_store.head(&path).await.unwrap();
@@ -384,3 +415,12 @@ pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, ObjectPa
 //         Ok(acc + bytes.iter().filter(|b| **b == 0).count())
 //     }).await.unwrap();
 //
+
+// cmk need README.md etc.
+// cmk set up the warnings for missing docs, etc
+// cmk add 64-bit test
+// cmk how can docs reference examples?
+// cmk make an example (and/or a method) for random region reading.
+// cmk limitations: no writing, no directories, no in-memory support, a bit-less efficient than generics,
+// cmk limitations: no option of which services, makes non-url usage awkward.
+// cmk be sure to turn on discussion

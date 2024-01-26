@@ -13,7 +13,6 @@ async fn count_lines(object_path: &ObjectPath) -> Result<usize, ObjectPathError>
     Ok(newline_count)
 }
 
-// cmk how can you test in memory with a URL?
 #[tokio::main]
 async fn main() -> Result<(), ObjectPathError> {
     let object_path = ObjectPath::new(
