@@ -1,4 +1,4 @@
-cmkcloud-files
+cloud-files
 ==========
 
 <!-- markdownlint-disable MD033 -->
@@ -8,17 +8,17 @@ cmkcloud-files
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/CarlKCarlK/cloud-files/CI/main?style=for-the-badge" height="20">](https://github.com/CarlKCarlK/cloud-files/actions?query=branch%3Amain)
 <!-- markdownlint-enable MD033 -->
 
-Simple reading of files in the cloud.
+Simple reading of files in the cloud for Rust.
 
 Highlights
 ----------
 
-* HTTP, AWS S3, Azur--tPath, Google, or local
+* HTTP, AWS S3, Azure, Google, or local
 * Sequental or random access
 * Simplifies use of the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, focusing on a useful subset of its features.
-* Access based on URLs and string-to-string options.
+* Access based on URLs and string-based options.
 * Binary or text
-* Used by [BedReader](https://github.com/fastlmm/BedReader) which is used by other Rust and Python genomics projects
+* Used by genomics tool [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
 
 Install
 -------
