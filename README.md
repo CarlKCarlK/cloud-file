@@ -34,9 +34,9 @@ Find the size of a cloud file.
 
 ```rust
 use cloud_file::{CloudFile, EMPTY_OPTIONS};
-
 # { use {cloud_file::CloudFileError, tokio::runtime::Runtime}; // '#' needed for doctest
 # Runtime::new().unwrap().block_on(async {
+
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
 let size = cloud_file.size().await?;
@@ -49,9 +49,9 @@ Find the number of line in a cloud file.
 ```rust
 use cloud_file::{CloudFile,EMPTY_OPTIONS};
 use futures_util::StreamExt;
-
 # { use {cloud_file::CloudFileError, tokio::runtime::Runtime};
 # Runtime::new().unwrap().block_on(async {
+
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
 let mut stream = cloud_file.get().await?.into_stream();
