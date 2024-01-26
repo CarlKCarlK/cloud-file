@@ -1,11 +1,11 @@
 use anyhow::anyhow;
+use cloud_files::{CloudFiles, EMPTY_OPTIONS};
 use futures::pin_mut;
 use futures_util::StreamExt;
-use object_path::{ObjectPath, EMPTY_OPTIONS};
 use object_store::delimited::newline_delimited_stream;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<String, anyhow::Error> {
+async fn random_line(cloud_files: &CloudFiles, seed: Option<u64>) -> Result<String, anyhow::Error> {
     let mut rng = if let Some(s) = seed {
         StdRng::seed_from_u64(s)
     } else {
@@ -13,7 +13,7 @@ async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<Stri
     };
     let mut selected_line = None;
 
-    let stream = object_path.get().await?.into_stream();
+    let stream = cloud_files.get().await?.into_stream();
     let line_chunk_stream = newline_delimited_stream(stream);
     pin_mut!(line_chunk_stream);
 
@@ -37,11 +37,11 @@ async fn random_line(object_path: &ObjectPath, seed: Option<u64>) -> Result<Stri
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let object_path = ObjectPath::new(
+    let cloud_files = CloudFiles::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
         EMPTY_OPTIONS,
     )?;
-    let line = random_line(&object_path, None).await?;
+    let line = random_line(&cloud_files, None).await?;
     println!("random line: {line}");
     Ok(())
 }

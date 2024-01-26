@@ -1,11 +1,11 @@
+use cloud_files::CloudFiles;
 use futures::pin_mut;
 use futures_util::StreamExt;
-use object_path::ObjectPath;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{cmp::max, collections::HashMap, ops::Range};
 
 async fn count_bigrams(
-    object_path: ObjectPath,
+    cloud_files: CloudFiles,
     sample_count: usize,
     seed: Option<u64>,
     max_concurrent_requests: usize,
@@ -19,7 +19,7 @@ async fn count_bigrams(
     };
 
     // Find the document size and then choose the two-byte ranges to sample
-    let size = object_path.size().await?;
+    let size = cloud_files.size().await?;
     let range_samples: Vec<Range<usize>> = (0..sample_count)
         .map(|_| rng.gen_range(0..size - 1))
         .map(|start| start..start + 2)
@@ -32,8 +32,8 @@ async fn count_bigrams(
 
     // Create an iterator of future work
     let work_chunks_iterator = range_chunks.map(|chunk| {
-        let object_path = object_path.clone(); // by design, clone is cheap
-        async move { object_path.get_ranges(chunk).await }
+        let cloud_files = cloud_files.clone(); // by design, clone is cheap
+        async move { cloud_files.get_ranges(chunk).await }
     });
 
     // Create a stream of futures to run out-of-order and with limited concurrency.
@@ -65,12 +65,12 @@ async fn count_bigrams(
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // use object_path::{abs_path_to_url_string, EMPTY_OPTIONS};
+    // use cloud_files::{abs_path_to_url_string, EMPTY_OPTIONS};
     // let file_name = r"C:\Users\carlk\OneDrive\programs\bed-sample-files\toydata.5chrom.fam";
     // let url = abs_path_to_url_string(file_name)?;
-    // let object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
+    // let cloud_files = CloudFiles::new(url, EMPTY_OPTIONS)?;
 
-    let object_path = ObjectPath::new(
+    let cloud_files = CloudFiles::new(
         "https://www.gutenberg.org/cache/epub/100/pg100.txt",
         [("timeout", "30s")],
     )?;
@@ -81,7 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let max_concurrent_requests = 10; // 10 is a good default
 
     count_bigrams(
-        object_path,
+        cloud_files,
         sample_count,
         seed,
         max_concurrent_requests,

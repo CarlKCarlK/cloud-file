@@ -1,20 +1,20 @@
 use std::{collections::HashMap, ops::Range};
 
+use cloud_files::{abs_path_to_url_string, CloudFiles, EMPTY_OPTIONS};
 use futures::pin_mut;
 use futures_util::StreamExt;
-use object_path::{abs_path_to_url_string, ObjectPath, EMPTY_OPTIONS};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // let object_path = ObjectPath::new(
+    // let cloud_files = CloudFiles::new(
     //     "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
     //     EMPTY_OPTIONS,
     // )?;
     let file_name = r"C:\Users\carlk\OneDrive\programs\bed-sample-files\toydata.5chrom.fam";
     let url = abs_path_to_url_string(file_name)?;
-    let object_path = ObjectPath::new(url, EMPTY_OPTIONS)?;
-    let size = object_path.size().await?;
+    let cloud_files = CloudFiles::new(url, EMPTY_OPTIONS)?;
+    let size = cloud_files.size().await?;
     let seed = Some(0u64);
     let n = 1_000;
     let chunk_count = 100;
@@ -33,8 +33,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let chunks = ranges.chunks(chunk_count);
     let iterator = chunks.map(|chunk| {
-        let object_path = object_path.clone();
-        async move { object_path.get_ranges(chunk).await }
+        let cloud_files = cloud_files.clone();
+        async move { cloud_files.get_ranges(chunk).await }
     });
 
     let stream = futures_util::stream::iter(iterator).buffer_unordered(max_concurrent_requests);
