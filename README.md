@@ -16,7 +16,7 @@ Highlights
 * HTTP, AWS S3, Azure, Google, or local
 * Sequential or random access
 * Simplifies use of the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, focusing on a useful subset of its features
-* Access files with string-based on URLs and options
+* Access files with URLs ans string-based options
 * Read binary or text
 * Fully async
 * Used by genomics tool [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
@@ -34,27 +34,26 @@ Examples
 Find the size of a cloud file.
 
 ```rust
-use cloud_file::{CloudFile, EMPTY_OPTIONS};
-# { use {cloud_file::CloudFileError, tokio::runtime::Runtime}; // '#' needed for doctest
+use cloud_file::CloudFile;
 # Runtime::new().unwrap().block_on(async {
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+let cloud_file = CloudFile::new(url)?;
 let size = cloud_file.size().await?;
 assert_eq!(size, 14_361);
-# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap()};
+# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();
+# use {cloud_file::CloudFileError, tokio::runtime::Runtime}; // '#' needed for doctest
 ```
 
 Find the number of line in a cloud file.
 
 ```rust
-use cloud_file::{CloudFile,EMPTY_OPTIONS};
-use futures_util::StreamExt;
-# { use {cloud_file::CloudFileError, tokio::runtime::Runtime};   // '#' needed for doctest
-# Runtime::new().unwrap().block_on(async {
+use cloud_file::CloudFile;
+use futures::StreamExt; // let's us call 'next' on a stream
+# Runtime::new().unwrap().block_on(async { // '#' needed for doctest
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
 let mut stream = cloud_file.open().await?;
 let mut newline_count: usize = 0;
 while let Some(bytes) = stream.next().await {
@@ -63,16 +62,17 @@ while let Some(bytes) = stream.next().await {
     newline_count += count;
 }
 assert_eq!(newline_count, 500);
-# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap()};
+# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();
+# use {cloud_file::CloudFileError, tokio::runtime::Runtime};   
 ```
 
-More examples cmk test links
+More examples cmk test these in ci
 --------------
 
 | Example                                       | Description                                   |
 |-----------------------------------------------|-----------------------------------------------|
-| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file, from start to end, as binary chunks.  |
-| [`random_lines`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_lines.rs)   | Read a file, from start to end, as text lines.        |
+| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file as binary chunks.  |
+| [`random_line`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_line.rs)   | Read a file as text lines.        |
 | [`bigram_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/bigram_counts.rs) | Read random regions of a file, without regard to order.   |
 
 Project Links

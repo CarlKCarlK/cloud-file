@@ -1,7 +1,6 @@
 use anyhow::anyhow;
-use cloud_file::{CloudFile, EMPTY_OPTIONS};
-use futures::pin_mut;
-use futures_util::StreamExt;
+use cloud_file::CloudFile;
+use futures::{pin_mut, StreamExt};
 use object_store::delimited::newline_delimited_stream;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -15,6 +14,7 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
 
     let stream = cloud_file.open().await?;
     let line_chunk_stream = newline_delimited_stream(stream);
+    // Fixes a compiler error by pinning the stream on the stack for an async operation.
     pin_mut!(line_chunk_stream);
 
     let mut index_iter = 0..;
@@ -25,8 +25,8 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
 
-            // See https://towardsdatascience.com/interview-question-select-a-random-line-from-a-file-in-rust-c0a8cddcddfb
-            // for an explanation of this algorithm.
+            // For an explanation of this one-pass random-line algorithm, see
+            // https://towardsdatascience.com/interview-question-select-a-random-line-from-a-file-in-rust-c0a8cddcddfb
             if rng.gen_range(0..=index) == 0 {
                 selected_line = Some(line.to_string());
             }
@@ -40,7 +40,6 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
 async fn main() -> Result<(), anyhow::Error> {
     let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
-        EMPTY_OPTIONS,
     )?;
     let line = random_line(&cloud_file, None).await?;
     println!("random line: {line}");

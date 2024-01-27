@@ -116,11 +116,11 @@ use url::Url;
 /// # Examples
 ///
 /// ```
-/// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+/// use cloud_file::CloudFile;
 ///
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-/// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+/// let cloud_file = CloudFile::new(url)?;
 /// assert_eq!(cloud_file.size().await?, 303);
 /// # Ok::<(), CloudFileError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
@@ -153,22 +153,54 @@ impl Clone for CloudFile {
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
 impl CloudFile {
+    /// Create a new [`CloudFile`] from a URL string.
+    ///
+    /// cmk See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
+    ///
+    /// # Example
+    /// ```
+    /// use cloud_file::CloudFile;
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let cloud_file = CloudFile::new(url)?;
+    /// assert_eq!(cloud_file.size().await?, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
+    pub fn new(location: impl AsRef<str>) -> Result<CloudFile, CloudFileError> {
+        let location = location.as_ref();
+        let url = Url::parse(location)
+            .map_err(|e| CloudFileError::CannotParseUrl(location.to_string(), e.to_string()))?;
+
+        let (object_store, store_path): (DynObjectStore, StorePath) =
+            parse_url_opts_work_around(&url, EMPTY_OPTIONS)?;
+        let cloud_file = CloudFile {
+            cloud_service: Arc::new(object_store),
+            store_path,
+        };
+        Ok(cloud_file)
+    }
+
     /// Create a new [`CloudFile`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
     /// cmk See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
     /// assert_eq!(cloud_file.size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub fn new<I, K, V>(location: impl AsRef<str>, options: I) -> Result<CloudFile, CloudFileError>
+    pub fn new_with_options<I, K, V>(
+        location: impl AsRef<str>,
+        options: I,
+    ) -> Result<CloudFile, CloudFileError>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str>,
@@ -191,11 +223,11 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.fam";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url)?;
     /// assert_eq!(cloud_file.line_count().await?, 10);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
@@ -217,11 +249,11 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url)?;
     /// assert_eq!(cloud_file.size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
@@ -235,11 +267,11 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url)?;
     /// let byte_vec = cloud_file.ranges(&[0..10, 1000..1010]).await?;
     /// assert_eq!(byte_vec.len(), 2);
     /// assert_eq!(*byte_vec[0], *b"1\t1:1:A:C\t");
@@ -264,13 +296,12 @@ impl CloudFile {
     /// In one call, read the first three bytes of a genomic data file and get
     /// the size of the file. Check that the file starts with the expected file signature.
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     /// use object_store::{GetRange, GetOptions};
     ///
-    /// # use cloud_file::CloudFileError;
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url)?;
     /// let get_options = GetOptions {
     ///     range: Some(GetRange::Bounded(0..3)),
     ///     ..Default::default()
@@ -301,13 +332,11 @@ impl CloudFile {
     /// In one call, read the first three bytes of a genomic data file and get
     /// the size of the file. Check that the file starts with the expected file signature.
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
-    /// use object_store::{GetRange, GetOptions};
+    /// use cloud_file::CloudFile;
     ///
-    /// # use cloud_file::CloudFileError;
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url)?;
     /// let (bytes, size) = cloud_file.range_and_size(0..3).await?;
     /// assert_eq!(bytes[0], 0x6c);
     /// assert_eq!(bytes[1], 0x1b);
@@ -349,10 +378,9 @@ impl CloudFile {
     /// use cloud_file::CloudFile;
     /// use futures_util::StreamExt;
     ///
-    /// # use cloud_file::CloudFileError;
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
     /// let mut stream = cloud_file.get().await?.into_stream();
     /// let mut newline_count: usize = 0;
     /// while let Some(bytes) = stream.next().await {
@@ -376,13 +404,11 @@ impl CloudFile {
     /// for the newline character.
     ///
     /// ```rust
-    /// use cloud_file::CloudFile; // cmk needed?
-    /// use futures_util::StreamExt;
+    /// use cloud_file::CloudFile;
     ///
-    /// # use cloud_file::CloudFileError;
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
     /// let bytes = cloud_file.bytes().await?;
     /// let newline_count = bytecount::count(&bytes, b'\n');
     /// assert_eq!(newline_count, 500);
@@ -408,12 +434,11 @@ impl CloudFile {
     ///
     /// ```rust
     /// use cloud_file::CloudFile;
-    /// use futures_util::StreamExt;
+    /// use futures::StreamExt; // let's us call 'next' on a stream
     ///
-    /// # use cloud_file::CloudFileError;
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
     /// let mut stream = cloud_file.open().await?;
     /// let mut newline_count: usize = 0;
     /// while let Some(bytes) = stream.next().await {
@@ -446,11 +471,11 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use cloud_file::CloudFile;
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let mut cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let mut cloud_file = CloudFile::new(url)?;
     /// cloud_file.set_extension("fam")?;
     /// assert_eq!(cloud_file.size().await?, 130);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -586,7 +611,7 @@ pub enum CloudFileError {
 async fn cloud_file_2() -> Result<(), CloudFileError> {
     let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed",
-        EMPTY_OPTIONS,
+        
     )?;
     assert_eq!(cloud_file.size().await?, 303);
     Ok(())
@@ -595,7 +620,7 @@ async fn cloud_file_2() -> Result<(), CloudFileError> {
 #[tokio::test]
 async fn cloud_file_extension() -> Result<(), CloudFileError> {
     let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    let mut cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    let mut cloud_file = CloudFile::new(url)?;
     assert_eq!(cloud_file.size().await?, 303);
     cloud_file.set_extension("fam")?;
     assert_eq!(cloud_file.size().await?, 130);
@@ -624,7 +649,7 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
         ("aws_secret_access_key", credentials.aws_secret_access_key()),
     ];
 
-    let cloud_file = CloudFile::new(url, options)?;
+    let cloud_file = CloudFile::new_with_options(url, options)?;
     assert_eq!(cloud_file.size().await?, 1_250_003);
     Ok(())
 }
@@ -649,7 +674,7 @@ fn readme_1() {
         .unwrap()
         .block_on(async {
             let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
-            let cloud_file = CloudFile::new(url,EMPTY_OPTIONS)?;
+            let cloud_file = CloudFile::new(url)?;
             let mut stream = cloud_file.open().await?;
             let mut newline_count: usize = 0;
             while let Some(bytes) = stream.next().await {

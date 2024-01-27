@@ -1,5 +1,5 @@
-use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
-use futures_util::StreamExt;
+use cloud_file::{CloudFile, CloudFileError};
+use futures_util::StreamExt; // let's us use the next() method on streams
 
 async fn count_lines(cloud_file: &CloudFile) -> Result<usize, CloudFileError> {
     let mut stream = cloud_file.open().await?;
@@ -17,7 +17,6 @@ async fn count_lines(cloud_file: &CloudFile) -> Result<usize, CloudFileError> {
 async fn main() -> Result<(), CloudFileError> {
     let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
-        EMPTY_OPTIONS,
     )?;
     let line_count = count_lines(&cloud_file).await?;
     println!("line_count: {}", line_count);

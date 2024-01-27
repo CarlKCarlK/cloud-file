@@ -65,12 +65,7 @@ async fn count_bigrams(
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // use cloud_file::{abs_path_to_url_string, EMPTY_OPTIONS};
-    // let file_name = r"C:\Users\carlk\OneDrive\programs\bed-sample-files\toydata.5chrom.fam";
-    // let url = abs_path_to_url_string(file_name)?;
-    // let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
-
-    let cloud_file = CloudFile::new(
+    let cloud_file = CloudFile::new_with_options(
         "https://www.gutenberg.org/cache/epub/100/pg100.txt",
         [("timeout", "30s")],
     )?;
