@@ -33,7 +33,7 @@ async fn count_bigrams(
     // Create an iterator of future work
     let work_chunks_iterator = range_chunks.map(|chunk| {
         let cloud_file = cloud_file.clone(); // by design, clone is cheap
-        async move { cloud_file.get_ranges(chunk).await }
+        async move { cloud_file.ranges(chunk).await }
     });
 
     // Create a stream of futures to run out-of-order and with limited concurrency.

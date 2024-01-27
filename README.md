@@ -8,16 +8,17 @@ cloud-file
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/CarlKCarlK/cloud-file/CI/main?style=for-the-badge" height="20">](https://github.com/CarlKCarlK/cloud-file/actions?query=branch%3Amain)
 <!-- markdownlint-enable MD033 -->
 
-Simple reading of files in the cloud for Rust.
+Simplified reading of cloud files in Rust
 
 Highlights
 ----------
 
 * HTTP, AWS S3, Azure, Google, or local
-* Sequental or random access
-* Simplifies use of the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, focusing on a useful subset of its features.
-* Access based on URLs and string-based options.
+* Sequential or random access
+* Simplifies use of the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, focusing on a useful subset of its features
+* Access files with string-based on URLs and options
 * Read binary or text
+* Fully async
 * Used by genomics tool [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
 
 Install
@@ -49,12 +50,12 @@ Find the number of line in a cloud file.
 ```rust
 use cloud_file::{CloudFile,EMPTY_OPTIONS};
 use futures_util::StreamExt;
-# { use {cloud_file::CloudFileError, tokio::runtime::Runtime};
+# { use {cloud_file::CloudFileError, tokio::runtime::Runtime};   // '#' needed for doctest
 # Runtime::new().unwrap().block_on(async {
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
-let mut stream = cloud_file.get().await?.into_stream();
+let mut stream = cloud_file.open().await?;
 let mut newline_count: usize = 0;
 while let Some(bytes) = stream.next().await {
     let bytes = bytes?;
@@ -62,16 +63,24 @@ while let Some(bytes) = stream.next().await {
     newline_count += count;
 }
 assert_eq!(newline_count, 500);
-# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap()};  // '#' needed for doctest
+# Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap()};
 ```
+
+More examples
+--------------
+
+| Example                                       | Description                                   |
+|-----------------------------------------------|-----------------------------------------------|
+| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_counts.rs)     | Read a file, from start to end, as binary chunks.  |
+| [`random_lines`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_lines.rs)   | Read a file, from start to end, as text lines.        |
+| [`bigram_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/bigram_counts.rs) | Read random regions of a file, without regard to order.   |
 
 Project Links
 -----
 
 * [**Installation**](https://crates.io/crates/cloud-file)
 * [**Documentation**](https://docs.rs/cloud-file/)
-* [**Questions via email**](mailto://fastlmm-dev@python.org)
-* [**Source code**](https://github.com/CarlKCarlK/cloud-file)
 * [**Discussion**](https://github.com/CarlKCarlK/cloud-file/discussions/)
+* [**Source code**](https://github.com/CarlKCarlK/cloud-file)
 * [**Bug Reports**](https://github.com/CarlKCarlK/cloud-file/issues)
 * [**Change Log**](https://github.com/CarlKCarlK/cloud-file/blob/main/CHANGELOG.md)

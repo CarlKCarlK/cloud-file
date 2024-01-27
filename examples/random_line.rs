@@ -13,7 +13,7 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
     };
     let mut selected_line = None;
 
-    let stream = cloud_file.get().await?.into_stream();
+    let stream = cloud_file.open().await?;
     let line_chunk_stream = newline_delimited_stream(stream);
     pin_mut!(line_chunk_stream);
 
@@ -25,7 +25,8 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
 
-            // cmk: see article for explanation of this algorithm
+            // See https://towardsdatascience.com/interview-question-select-a-random-line-from-a-file-in-rust-c0a8cddcddfb
+            // for an explanation of this algorithm.
             if rng.gen_range(0..=index) == 0 {
                 selected_line = Some(line.to_string());
             }

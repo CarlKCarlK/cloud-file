@@ -10,15 +10,96 @@
     clippy::cast_lossless
 )]
 #![doc = include_str!("../README.md")]
-//! ## Main Functions cmk
+//! ## Main Functions
+//!
+//! | Function | Description |
+//! | -------- | ----------- |
+//! | [`CloudFile::new`](struct.CloudFile.html#method.new) | Use a URL and options to specify a cloud file for reading. |
+//!
+//! ### `CloudFile` Methods
+//!
+//! After using [`CloudFile::new`](struct.CloudFile.html#method.new), use
+//! these methods to read from the file.
+//!
+//! | Method | Description |
+//! | -------- | ----------- |
+//! | [`get`](struct.CloudFile.html#method.iid_count) | Number of individuals (samples) |
+//! | [`clone`](struct.CloudFile.html#method.sid_count) | Number of SNPs (variants) |
+//! | [`cmk`](struct.CloudFile.html#method.dim) | Number of individuals and SNPs |
+//! cmk also give a table of common urls and options
+//!
+//! ### `ReadOptions`
+//!
+//! When using [`ReadOptions::builder`](struct.ReadOptions.html#method.builder) to read genotype data, use these options to
+//! specify a desired numeric type,
+//! which individuals (samples) to read, which SNPs (variants) to read, etc.
+//!
+//! | Option | Description |
+//! | -------- | ----------- |
+//! | [`i8`](struct.ReadOptionsBuilder.html#method.i8) | Read values as i8 |
+//! | [`f32`](struct.ReadOptionsBuilder.html#method.f32) | Read values as f32 |
+//! | [`f64`](struct.ReadOptionsBuilder.html#method.f64) | Read values as f64 |
+//! | [`iid_index`](struct.ReadOptionsBuilder.html#method.iid_index) | Index of individuals (samples) to read (defaults to all)|
+//! | [`sid_index`](struct.ReadOptionsBuilder.html#method.sid_index) | Index of SNPs (variants) to read (defaults to all) |
+//! | [`f`](struct.ReadOptionsBuilder.html#method.f) | Order of the output array, Fortran-style (default) |
+//! | [`c`](struct.ReadOptionsBuilder.html#method.c) | Order of the output array, C-style |
+//! | [`is_f`](struct.ReadOptionsBuilder.html#method.is_f) | Is order of the output array Fortran-style? (defaults to true)|
+//! | [`missing_value`](struct.ReadOptionsBuilder.html#method.missing_value) | Value to use for missing values (defaults to -127 or NaN) |
+//! | [`count_a1`](struct.ReadOptionsBuilder.html#method.count_a1) | Count the number allele 1 (default) |
+//! | [`count_a2`](struct.ReadOptionsBuilder.html#method.count_a2) | Count the number allele 2 |
+//! | [`is_a1_counted`](struct.ReadOptionsBuilder.html#method.is_a1_counted) | Is allele 1 counted? (defaults to true) |
+//! | [`num_threads`](struct.ReadOptionsBuilder.html#method.num_threads) | Number of threads to use (defaults to all processors) |
+//! | [`max_concurrent_requests`](struct.ReadOptionsBuilder.html#method.max_concurrent_requests) | Maximum number of concurrent async requests (defaults to 10) -- Used by [`BedCloud`](struct.BedCloud.html). |
+//! | [`max_chunk_size`](struct.ReadOptionsBuilder.html#method.max_chunk_size) | Maximum chunk size of async requests (defaults to 8_000_000 bytes) -- Used by [`BedCloud`](struct.BedCloud.html). |
+//!
+//! ### [`Index`](enum.Index.html) Expressions
+//!
+//! Select which individuals (samples) and SNPs (variants) to read by using these
+//! [`iid_index`](struct.ReadOptionsBuilder.html#method.iid_index) and/or
+//! [`sid_index`](struct.ReadOptionsBuilder.html#method.sid_index) expressions.
+//!
+//! | Example | Type | Description |
+//! | -------- | --- | ----------- |
+//! | nothing | `()` | All |
+//! | `2` | `isize` | Index position 2 |
+//! | `-1` | `isize` | Last index position |
+//! | `vec![0, 10, -2]` | `Vec<isize>` | Index positions 0, 10, and 2nd from last |
+//! | `[0, 10, -2]` | `[isize]` and `[isize;n]` | Index positions 0, 10, and 2nd from last |
+//! | `ndarray::array![0, 10, -2]` | `ndarray::Array1<isize>` | Index positions 0, 10, and 2nd from last |
+//! | `10..20` | `Range<usize>` | Index positions 10 (inclusive) to 20 (exclusive). *Note: Rust ranges don't support negatives* |
+//! | `..=19` | `RangeInclusive<usize>` | Index positions 0 (inclusive) to 19 (inclusive). *Note: Rust ranges don't support negatives* |
+//! | *any Rust ranges* | `Range*<usize>` | *Note: Rust ranges don't support negatives* |
+//! | `s![10..20;2]` | `ndarray::SliceInfo1` | Index positions 10 (inclusive) to 20 (exclusive) in steps of 2 |
+//! | `s![-20..-10;-2]` | `ndarray::SliceInfo1` | 10th from last (exclusive) to 20th from last (inclusive), in steps of -2 |
+//! | `vec![true, false, true]` | `Vec<bool>`| Index positions 0 and 2. |
+//! | `[true, false, true]` | `[bool]` and `[bool;n]`| Index positions 0 and 2.|
+//! | `ndarray::array![true, false, true]` | `ndarray::Array1<bool>`| Index positions 0 and 2.|
+//!
+//! ### Environment Variables
+//!
+//! * `BED_READER_NUM_THREADS`
+//! * `NUM_THREADS`
+//!
+//! If [`ReadOptionsBuilder::num_threads`](struct.ReadOptionsBuilder.html#method.num_threads)
+//! or [`WriteOptionsBuilder::num_threads`](struct.WriteOptionsBuilder.html#method.num_threads) is not specified,
+//! the number of threads to use is determined by these environment variable (in order of priority):
+//! If neither of these environment variables are set, all processors are used.
+//!
+//! * `BED_READER_DATA_DIR`
+//!
+//! Any requested sample file will be downloaded to this directory. If the environment variable is not set,
+//! a cache folder, appropriate to the OS, will be used.
+
 // cmk like bed-reader, but with links to examples and maybe supplemental doc
 
 use bytes::Bytes;
 use core::fmt;
+use futures_util::stream::BoxStream;
 use futures_util::TryStreamExt;
 use object_store::http::HttpBuilder;
-use object_store::path::Path as StorePath;
-use object_store::{GetOptions, GetResult, ObjectStore};
+#[doc(no_inline)]
+pub use object_store::path::Path as StorePath;
+use object_store::{GetOptions, GetRange, GetResult, ObjectStore};
 use std::ops::{Deref, Range};
 use std::path::Path;
 use std::sync::Arc;
@@ -28,16 +109,9 @@ use url::Url;
 #[derive(Debug)]
 /// The main struct representing the location of a file in the cloud.
 ///
-/// cmk change ObjectStore to DynObjectStore
-/// The location is made up of of two parts, an `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
-/// and an [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
-/// The [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) is a cloud service, for example, Http, AWS S3, Azure,
-/// the local file system, etc. The `StorePath` is the path to the file on the cloud service.
+/// It is constructed with [`CloudFile::new`](struct.CloudFile.html#method.new). It is, by design, cheap to clone.
 ///
-/// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
-///
-/// An `CloudFile` can be efficiently cloned because the `ObjectStore` is `Arc`-wrapped.
-/// /// cmk change ObjectStore to DynObjectStore
+/// Internally, it stores two pieces of information: the file's cloud service and the path to the file on that service.
 ///
 /// # Examples
 ///
@@ -46,26 +120,27 @@ use url::Url;
 ///
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-/// let cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+/// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
 /// assert_eq!(cloud_file.size().await?, 303);
 /// # Ok::<(), CloudFileError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime};
 /// ```
 pub struct CloudFile {
-    /// cmk change ObjectStore to DynObjectStore
-    /// An `Arc`-wrapped [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) cloud service, for example, Http, AWS S3,
-    /// Azure, the local file system, etc.
-    pub arc_object_store: Arc<DynObjectStore>,
-    /// A [`object_store::path::Path as StorePath`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html) that points to a file on
-    /// the [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
-    /// that gives the path to the file on the cloud service.
+    /// A cloud service, for example, Http, AWS S3, Azure, the local file system, etc.
+    /// Under the covers, it is an `Arc`-wrapped [`DynObjectStore`](struct.DynObjectStore.html)
+    /// Another layer down, it holds an [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) from the
+    /// powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate.
+    pub cloud_service: Arc<DynObjectStore>,
+    /// A path to a file on the cloud service.
+    /// Under the covers, `StorePath` is an alias for a [`Path`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html)
+    /// in the [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate.
     pub store_path: StorePath,
 }
 
 impl Clone for CloudFile {
     fn clone(&self) -> Self {
         CloudFile {
-            arc_object_store: self.arc_object_store.clone(),
+            cloud_service: self.cloud_service.clone(),
             store_path: self.store_path.clone(),
         }
     }
@@ -80,7 +155,7 @@ pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 impl CloudFile {
     /// Create a new [`CloudFile`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
     ///
-    /// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
+    /// cmk See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
     ///
     /// # Example
     /// ```
@@ -106,15 +181,27 @@ impl CloudFile {
         let (object_store, store_path): (DynObjectStore, StorePath) =
             parse_url_opts_work_around(&url, options)?;
         let cloud_file = CloudFile {
-            arc_object_store: Arc::new(object_store),
+            cloud_service: Arc::new(object_store),
             store_path,
         };
         Ok(cloud_file)
     }
 
-    /// cmk create docs
+    /// Count the lines in a file stored in the cloud.
+    ///
+    /// # Example
+    /// ```
+    /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.fam";
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// assert_eq!(cloud_file.line_count().await?, 10);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime};
+    /// ```
     pub async fn line_count(&self) -> Result<usize, CloudFileError> {
-        let stream = self.get().await?.into_stream();
+        let stream = self.open().await?;
 
         let newline_count = stream
             .try_fold(0, |acc, bytes| async move {
@@ -134,38 +221,161 @@ impl CloudFile {
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
     /// assert_eq!(cloud_file.size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
     pub async fn size(&self) -> Result<usize, CloudFileError> {
-        let meta = self.arc_object_store.head(&self.store_path).await?;
+        let meta = self.cloud_service.head(&self.store_path).await?;
         Ok(meta.size)
     }
 
-    /// cmk need an example
-    /// Return the bytes that are stored at the specified location(s) in the given byte ranges
-    pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
+    // /// Return the bytes that are stored at the specified location(s) in the given byte ranges
+    // ///
+    // /// # Example
+    // /// ```
+    // /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
+    // ///
+    // /// # Runtime::new().unwrap().block_on(async {
+    // /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
+    // /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    // /// let byte_vec = cloud_file.get_ranges(&[0..10, 1000..1010]).await?;
+    // /// assert_eq!(byte_vec.len(), 2);
+    // /// assert_eq!(*byte_vec[0], *b"1\t1:1:A:C\t");
+    // /// assert_eq!(*byte_vec[1], *b":A:C\t0.0\t4");
+    // /// # Ok::<(), CloudFileError>(())}).unwrap();
+    // /// # use {tokio::runtime::Runtime};
+    // /// ```
+    // pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
+    //     Ok(self
+    //         .cloud_service
+    //         .get_ranges(&self.store_path, ranges)
+    //         .await?)
+    // }
+
+    /// cmk
+    pub async fn ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
         Ok(self
-            .arc_object_store
+            .cloud_service
             .get_ranges(&self.store_path, ranges)
             .await?)
     }
 
-    /// Perform a get request with options
-    /// cmk need an example
-    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFileError> {
-        Ok(self
-            .arc_object_store
+    // /// Do a 'get' using an [`object_store::GetOptions`](https://docs.rs/object_store/latest/object_store/struct.GetOptions.html)
+    // /// from the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate. You
+    // /// can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
+    // /// result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html).
+    // ///
+    // /// # Example
+    // ///
+    // /// In one call, read the first three bytes of a genomic data file and get
+    // /// the size of the file. Check that the file starts with the expected file signature.
+    // /// ```
+    // /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    // /// use object_store::{GetRange, GetOptions};
+    // ///
+    // /// # use cloud_file::CloudFileError;
+    // /// # Runtime::new().unwrap().block_on(async {
+    // /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    // /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    // /// let get_options = GetOptions {
+    // ///     range: Some(GetRange::Bounded(0..3)),
+    // ///     ..Default::default()
+    // /// };
+    // /// let get_result = cloud_file.get_opts(get_options).await?;
+    // /// let size: usize = get_result.meta.size;
+    // /// let bytes = get_result
+    // ///     .bytes()
+    // ///     .await?;
+    // /// assert_eq!(bytes[0], 0x6c);
+    // /// assert_eq!(bytes[1], 0x1b);
+    // /// assert_eq!(bytes[2], 0x01);
+    // /// assert_eq!(size, 303);
+    // /// # Ok::<(), CloudFileError>(())}).unwrap();
+    // /// # use {tokio::runtime::Runtime};
+    // /// ```
+    // pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFileError> {
+    //     Ok(self
+    //         .cloud_service
+    //         .get_opts(&self.store_path, get_options)
+    //         .await?)
+    // }
+
+    /// cmk
+    pub async fn range_and_size(
+        &self,
+        range: Range<usize>,
+    ) -> Result<(Bytes, usize), CloudFileError> {
+        let get_options = GetOptions {
+            range: Some(GetRange::Bounded(range)),
+            ..Default::default()
+        };
+        let get_result = self
+            .cloud_service
             .get_opts(&self.store_path, get_options)
-            .await?)
+            .await?;
+        let size: usize = get_result.meta.size;
+        let bytes = get_result
+            .bytes()
+            .await
+            .map_err(CloudFileError::ObjectStoreError)?;
+        Ok((bytes, size))
     }
 
-    /// Return the bytes that are stored at the specified location.
-    /// cmk need an example
+    /// Do a 'get' with the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate.
+    /// The result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html) which can,
+    /// for example, be converted into a stream of bytes.
+    ///
+    /// # Example
+    ///
+    /// Do a 'get', turn result into a stream, then scan all the bytes of the
+    /// file for the newline character.
+    ///
+    /// ```rust
+    /// use cloud_file::CloudFile;
+    /// use futures_util::StreamExt;
+    ///
+    /// # use cloud_file::CloudFileError;
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let mut stream = cloud_file.open().await?;
+    /// let mut newline_count: usize = 0;
+    /// while let Some(bytes) = stream.next().await {
+    ///     let bytes = bytes?;
+    ///     let count = bytecount::count(&bytes, b'\n');
+    ///     newline_count += count;
+    ///     }
+    /// assert_eq!(newline_count, 500);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime};
+    /// ```
     pub async fn get(&self) -> Result<GetResult, CloudFileError> {
-        Ok(self.arc_object_store.get(&self.store_path).await?)
+        Ok(self.cloud_service.get(&self.store_path).await?)
+    }
+
+    /// cmk
+    pub async fn bytes(&self) -> Result<Bytes, CloudFileError> {
+        let bytes = self
+            .cloud_service
+            .get(&self.store_path)
+            .await?
+            .bytes()
+            .await?;
+        Ok(bytes)
+    }
+
+    /// cmk
+    pub async fn open(
+        &self,
+    ) -> Result<BoxStream<'static, object_store::Result<Bytes>>, CloudFileError> {
+        let stream = self
+            .cloud_service
+            .get(&self.store_path)
+            .await?
+            .into_stream();
+        Ok(stream)
     }
 
     /// Updates the [`CloudFile`] in place to have the given extension.
@@ -182,7 +392,7 @@ impl CloudFile {
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    /// let mut cloud_file = CloudFile::new(&url, EMPTY_OPTIONS)?;
+    /// let mut cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
     /// cloud_file.set_extension("fam")?;
     /// assert_eq!(cloud_file.size().await?, 130);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -274,37 +484,42 @@ impl fmt::Display for CloudFile {
     }
 }
 
-/// Wraps `Box<dyn ObjectStore>` for easier usage
+/// Wraps `Box<dyn ObjectStore>` for easier usage. An [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html), from the
+/// powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, represents a cloud service.
 #[derive(Debug)]
-pub struct DynObjectStore(Box<dyn ObjectStore>);
+pub struct DynObjectStore(pub Box<dyn ObjectStore>);
 
 // Implement Deref to allow access to the inner `ObjectStore` methods
 impl Deref for DynObjectStore {
     type Target = dyn ObjectStore;
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &*self.0
     }
 }
 
 impl DynObjectStore {
-    pub fn new<T: ObjectStore + 'static>(store: T) -> Self {
+    fn new<T: ObjectStore + 'static>(store: T) -> Self {
         DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
 }
 
+/// The error type for [`CloudFile`](struct.CloudFile.html) methods.
 #[derive(Error, Debug)]
 pub enum CloudFileError {
+    /// An error from [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate
     #[error("Object store error: {0}")]
     ObjectStoreError(#[from] object_store::Error),
 
+    /// An path-related error from [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate
     #[error("Object store path error: {0}")]
     ObjectStorePathError(#[from] object_store::path::Error),
 
+    /// An error related to parsing a URL string
     #[error("Cannot parse URL: {0} {1}")]
     CannotParseUrl(String, String),
 
-    #[allow(missing_docs)]
+    /// An error related to creating a URL from a file path
     #[error("Cannot create URL from this absolute file path: '{0}'")]
     CannotCreateUrlFromFilePath(String),
 }
@@ -377,7 +592,7 @@ fn readme_1() {
         .block_on(async {
             let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
             let cloud_file = CloudFile::new(url,EMPTY_OPTIONS)?;
-            let mut stream = cloud_file.get().await?.into_stream();
+            let mut stream = cloud_file.open().await?;
             let mut newline_count: usize = 0;
             while let Some(bytes) = stream.next().await {
                 let bytes = bytes?;

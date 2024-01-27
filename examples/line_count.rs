@@ -2,7 +2,7 @@ use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
 use futures_util::StreamExt;
 
 async fn count_lines(cloud_file: &CloudFile) -> Result<usize, CloudFileError> {
-    let mut stream = cloud_file.get().await?.into_stream();
+    let mut stream = cloud_file.open().await?;
     let mut newline_count: usize = 0;
     while let Some(bytes) = stream.next().await {
         let bytes = bytes?;
