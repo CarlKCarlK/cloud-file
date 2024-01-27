@@ -116,19 +116,19 @@ use url::Url;
 /// # Examples
 ///
 /// ```
-/// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
+/// use cloud_file::{CloudFile, EMPTY_OPTIONS};
 ///
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
 /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
 /// assert_eq!(cloud_file.size().await?, 303);
 /// # Ok::<(), CloudFileError>(())}).unwrap();
-/// # use {tokio::runtime::Runtime};
+/// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
 /// ```
 pub struct CloudFile {
     /// A cloud service, for example, Http, AWS S3, Azure, the local file system, etc.
-    /// Under the covers, it is an `Arc`-wrapped [`DynObjectStore`](struct.DynObjectStore.html)
-    /// Another layer down, it holds an [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) from the
+    /// Under the covers, it is an `Arc`-wrapped [`DynObjectStore`](struct.DynObjectStore.html).
+    /// The `DynObjectStore`, in turn, holds an [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) from the
     /// powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate.
     pub cloud_service: Arc<DynObjectStore>,
     /// A path to a file on the cloud service.
@@ -159,14 +159,14 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
     /// assert_eq!(cloud_file.size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime};
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
     pub fn new<I, K, V>(location: impl AsRef<str>, options: I) -> Result<CloudFile, CloudFileError>
     where
@@ -191,14 +191,14 @@ impl CloudFile {
     ///
     /// # Example
     /// ```
-    /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.fam";
     /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
     /// assert_eq!(cloud_file.line_count().await?, 10);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime};
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
     pub async fn line_count(&self) -> Result<usize, CloudFileError> {
         let stream = self.open().await?;
@@ -231,30 +231,22 @@ impl CloudFile {
         Ok(meta.size)
     }
 
-    // /// Return the bytes that are stored at the specified location(s) in the given byte ranges
-    // ///
-    // /// # Example
-    // /// ```
-    // /// use cloud_file::{CloudFile, CloudFileError, EMPTY_OPTIONS};
-    // ///
-    // /// # Runtime::new().unwrap().block_on(async {
-    // /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
-    // /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
-    // /// let byte_vec = cloud_file.get_ranges(&[0..10, 1000..1010]).await?;
-    // /// assert_eq!(byte_vec.len(), 2);
-    // /// assert_eq!(*byte_vec[0], *b"1\t1:1:A:C\t");
-    // /// assert_eq!(*byte_vec[1], *b":A:C\t0.0\t4");
-    // /// # Ok::<(), CloudFileError>(())}).unwrap();
-    // /// # use {tokio::runtime::Runtime};
-    // /// ```
-    // pub async fn get_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
-    //     Ok(self
-    //         .cloud_service
-    //         .get_ranges(&self.store_path, ranges)
-    //         .await?)
-    // }
-
-    /// cmk
+    /// Return the bytes that are stored at the specified location(s) in the given byte ranges
+    ///
+    /// # Example
+    /// ```
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let byte_vec = cloud_file.ranges(&[0..10, 1000..1010]).await?;
+    /// assert_eq!(byte_vec.len(), 2);
+    /// assert_eq!(*byte_vec[0], *b"1\t1:1:A:C\t");
+    /// assert_eq!(*byte_vec[1], *b":A:C\t0.0\t4");
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
     pub async fn ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
         Ok(self
             .cloud_service
@@ -262,47 +254,68 @@ impl CloudFile {
             .await?)
     }
 
-    // /// Do a 'get' using an [`object_store::GetOptions`](https://docs.rs/object_store/latest/object_store/struct.GetOptions.html)
-    // /// from the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate. You
-    // /// can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
-    // /// result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html).
-    // ///
-    // /// # Example
-    // ///
-    // /// In one call, read the first three bytes of a genomic data file and get
-    // /// the size of the file. Check that the file starts with the expected file signature.
-    // /// ```
-    // /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
-    // /// use object_store::{GetRange, GetOptions};
-    // ///
-    // /// # use cloud_file::CloudFileError;
-    // /// # Runtime::new().unwrap().block_on(async {
-    // /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
-    // /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
-    // /// let get_options = GetOptions {
-    // ///     range: Some(GetRange::Bounded(0..3)),
-    // ///     ..Default::default()
-    // /// };
-    // /// let get_result = cloud_file.get_opts(get_options).await?;
-    // /// let size: usize = get_result.meta.size;
-    // /// let bytes = get_result
-    // ///     .bytes()
-    // ///     .await?;
-    // /// assert_eq!(bytes[0], 0x6c);
-    // /// assert_eq!(bytes[1], 0x1b);
-    // /// assert_eq!(bytes[2], 0x01);
-    // /// assert_eq!(size, 303);
-    // /// # Ok::<(), CloudFileError>(())}).unwrap();
-    // /// # use {tokio::runtime::Runtime};
-    // /// ```
-    // pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFileError> {
-    //     Ok(self
-    //         .cloud_service
-    //         .get_opts(&self.store_path, get_options)
-    //         .await?)
-    // }
+    /// Do a 'get' using an [`object_store::GetOptions`](https://docs.rs/object_store/latest/object_store/struct.GetOptions.html)
+    /// from the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate. You
+    /// can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
+    /// result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html).
+    ///
+    /// # Example
+    ///
+    /// In one call, read the first three bytes of a genomic data file and get
+    /// the size of the file. Check that the file starts with the expected file signature.
+    /// ```
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use object_store::{GetRange, GetOptions};
+    ///
+    /// # use cloud_file::CloudFileError;
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let get_options = GetOptions {
+    ///     range: Some(GetRange::Bounded(0..3)),
+    ///     ..Default::default()
+    /// };
+    /// let get_result = cloud_file.get_opts(get_options).await?;
+    /// let size: usize = get_result.meta.size;
+    /// let bytes = get_result
+    ///     .bytes()
+    ///     .await?;
+    /// assert_eq!(bytes[0], 0x6c);
+    /// assert_eq!(bytes[1], 0x1b);
+    /// assert_eq!(bytes[2], 0x01);
+    /// assert_eq!(size, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
+    pub async fn get_opts(&self, get_options: GetOptions) -> Result<GetResult, CloudFileError> {
+        Ok(self
+            .cloud_service
+            .get_opts(&self.store_path, get_options)
+            .await?)
+    }
 
-    /// cmk
+    /// Retrieve a range of bytes and the file's total size.
+    ///
+    /// # Example
+    ///
+    /// In one call, read the first three bytes of a genomic data file and get
+    /// the size of the file. Check that the file starts with the expected file signature.
+    /// ```
+    /// use cloud_file::{CloudFile, EMPTY_OPTIONS};
+    /// use object_store::{GetRange, GetOptions};
+    ///
+    /// # use cloud_file::CloudFileError;
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    /// let cloud_file = CloudFile::new(url, EMPTY_OPTIONS)?;
+    /// let (bytes, size) = cloud_file.range_and_size(0..3).await?;
+    /// assert_eq!(bytes[0], 0x6c);
+    /// assert_eq!(bytes[1], 0x1b);
+    /// assert_eq!(bytes[2], 0x01);
+    /// assert_eq!(size, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
     pub async fn range_and_size(
         &self,
         range: Range<usize>,
@@ -340,7 +353,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
     /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
-    /// let mut stream = cloud_file.open().await?;
+    /// let mut stream = cloud_file.get().await?.into_stream();
     /// let mut newline_count: usize = 0;
     /// while let Some(bytes) = stream.next().await {
     ///     let bytes = bytes?;
@@ -349,13 +362,33 @@ impl CloudFile {
     ///     }
     /// assert_eq!(newline_count, 500);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
-    /// # use {tokio::runtime::Runtime};
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
     pub async fn get(&self) -> Result<GetResult, CloudFileError> {
         Ok(self.cloud_service.get(&self.store_path).await?)
     }
 
-    /// cmk
+    /// Read the whole file into an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html).
+    ///
+    /// # Example
+    ///
+    /// Read the whole file, then scan all the bytes of the
+    /// for the newline character.
+    ///
+    /// ```rust
+    /// use cloud_file::CloudFile; // cmk needed?
+    /// use futures_util::StreamExt;
+    ///
+    /// # use cloud_file::CloudFileError;
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let bytes = cloud_file.bytes().await?;
+    /// let newline_count = bytecount::count(&bytes, b'\n');
+    /// assert_eq!(newline_count, 500);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
     pub async fn bytes(&self) -> Result<Bytes, CloudFileError> {
         let bytes = self
             .cloud_service
@@ -366,7 +399,32 @@ impl CloudFile {
         Ok(bytes)
     }
 
-    /// cmk
+    /// Open the file to read as a stream of bytes.
+    ///
+    /// # Example
+    ///
+    /// Open the file as a stream of bytes, then scan all the bytes
+    /// for the newline character.
+    ///
+    /// ```rust
+    /// use cloud_file::CloudFile;
+    /// use futures_util::StreamExt;
+    ///
+    /// # use cloud_file::CloudFileError;
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    /// let cloud_file = CloudFile::new(url, [("timeout", "30s")])?;
+    /// let mut stream = cloud_file.open().await?;
+    /// let mut newline_count: usize = 0;
+    /// while let Some(bytes) = stream.next().await {
+    ///     let bytes = bytes?;
+    ///     let count = bytecount::count(&bytes, b'\n');
+    ///     newline_count += count;
+    ///     }
+    /// assert_eq!(newline_count, 500);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
     pub async fn open(
         &self,
     ) -> Result<BoxStream<'static, object_store::Result<Bytes>>, CloudFileError> {
@@ -604,29 +662,6 @@ fn readme_1() {
         })
         .unwrap();
 }
-
-// cmk understand these
-// // Fetch just the file metadata
-// let meta = object_store.head(&path).await.unwrap();
-// println!("{meta:?}");
-//
-// // Fetch the object including metadata
-// let result: GetResult = object_store.get(&path).await.unwrap();
-// assert_eq!(result.meta, meta);
-//
-// // Buffer the entire object in memory
-// let object: Bytes = result.bytes().await.unwrap();
-// assert_eq!(object.len(), meta.size);
-//
-// // Alternatively stream the bytes from object storage
-// let stream = object_store.get(&path).await.unwrap().into_stream();
-//
-// // Count the '0's using `try_fold` from `TryStreamExt` trait
-// let num_zeros = stream
-//     .try_fold(0, |acc, bytes| async move {
-//         Ok(acc + bytes.iter().filter(|b| **b == 0).count())
-//     }).await.unwrap();
-//
 
 // cmk need README.md etc.
 // cmk set up the warnings for missing docs, etc

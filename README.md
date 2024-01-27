@@ -66,12 +66,12 @@ assert_eq!(newline_count, 500);
 # Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap()};
 ```
 
-More examples
+More examples cmk test links
 --------------
 
 | Example                                       | Description                                   |
 |-----------------------------------------------|-----------------------------------------------|
-| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_counts.rs)     | Read a file, from start to end, as binary chunks.  |
+| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file, from start to end, as binary chunks.  |
 | [`random_lines`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_lines.rs)   | Read a file, from start to end, as text lines.        |
 | [`bigram_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/bigram_counts.rs) | Read random regions of a file, without regard to order.   |
 
