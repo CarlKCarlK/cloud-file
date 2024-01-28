@@ -1,15 +1,13 @@
 use cloud_file::{CloudFile, CloudFileError};
-use futures_util::StreamExt; // let's us use the next() method on streams
+use futures_util::StreamExt; // Enables `.next()` on streams.
 
 async fn count_lines(cloud_file: &CloudFile) -> Result<usize, CloudFileError> {
     let mut stream = cloud_file.open().await?;
     let mut newline_count: usize = 0;
     while let Some(bytes) = stream.next().await {
         let bytes = bytes?;
-        let count = bytecount::count(&bytes, b'\n');
-        newline_count += count;
+        newline_count += bytecount::count(&bytes, b'\n');
     }
-
     Ok(newline_count)
 }
 

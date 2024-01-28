@@ -8,7 +8,7 @@ cloud-file
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/CarlKCarlK/cloud-file/CI/main?style=for-the-badge" height="20">](https://github.com/CarlKCarlK/cloud-file/actions?query=branch%3Amain)
 <!-- markdownlint-enable MD033 -->
 
-Simplified reading of cloud files in Rust
+Simple reading of cloud files in Rust
 
 Highlights
 ----------
@@ -16,10 +16,10 @@ Highlights
 * HTTP, AWS S3, Azure, Google, or local
 * Sequential or random access
 * Simplifies use of the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate, focusing on a useful subset of its features
-* Access files with URLs ans string-based options
+* Access files via URLs and string-based options
 * Read binary or text
 * Fully async
-* Used by genomics tool [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
+* Used by genomics crate [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
 
 Install
 -------
@@ -45,11 +45,11 @@ assert_eq!(size, 14_361);
 # use {cloud_file::CloudFileError, tokio::runtime::Runtime}; // '#' needed for doctest
 ```
 
-Find the number of line in a cloud file.
+Find the number of lines in a cloud file.
 
 ```rust
 use cloud_file::CloudFile;
-use futures::StreamExt; // let's us call 'next' on a stream
+use futures::StreamExt; // Enables `.next()` on streams.
 # Runtime::new().unwrap().block_on(async { // '#' needed for doctest
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
@@ -58,8 +58,7 @@ let mut stream = cloud_file.open().await?;
 let mut newline_count: usize = 0;
 while let Some(bytes) = stream.next().await {
     let bytes = bytes?;
-    let count = bytecount::count(&bytes, b'\n');
-    newline_count += count;
+    newline_count += bytecount::count(&bytes, b'\n');
 }
 assert_eq!(newline_count, 500);
 # Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();
@@ -74,13 +73,14 @@ More examples cmk test these in ci
 | [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file as binary chunks.  |
 | [`random_line`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_line.rs)   | Read a file as text lines.        |
 | [`bigram_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/bigram_counts.rs) | Read random regions of a file, without regard to order.   |
+| [`aws_file_size`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/aws_file_size.rs) | Find the size of a file on AWS.   |
 
 Project Links
 -----
 
 * [**Installation**](https://crates.io/crates/cloud-file)
 * [**Documentation**](https://docs.rs/cloud-file/)
-* [**Discussion**](https://github.com/CarlKCarlK/cloud-file/discussions/)
+* [**Discussion and Questions**](https://github.com/CarlKCarlK/cloud-file/discussions/)
 * [**Source code**](https://github.com/CarlKCarlK/cloud-file)
 * [**Bug Reports**](https://github.com/CarlKCarlK/cloud-file/issues)
 * [**Change Log**](https://github.com/CarlKCarlK/cloud-file/blob/main/CHANGELOG.md)

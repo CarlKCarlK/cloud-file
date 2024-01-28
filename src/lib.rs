@@ -14,83 +14,68 @@
 //!
 //! | Function | Description |
 //! | -------- | ----------- |
-//! | [`CloudFile::new`](struct.CloudFile.html#method.new) | Use a URL and options to specify a cloud file for reading. |
+//! | [`CloudFile::new`](struct.CloudFile.html#method.new) | Use a URL to specify a cloud file for reading. |
+//! | [`CloudFile::new_with_options`](struct.CloudFile.html#method.new_with_options) | Use a URL and options to specify a cloud file for reading. |
 //!
-//! ### `CloudFile` Methods
+//! ## URLs
 //!
-//! After using [`CloudFile::new`](struct.CloudFile.html#method.new), use
-//! these methods to read from the file.
+//! | Cloud Service | Example |
+//! | ------------- | ------- |
+//! | HTTP          | `https://www.gutenberg.org/cache/epub/100/pg100.txt` |
+//! | local file    | `file:///C:/Users/carlk/AppData/Local/bed_reader/bed_reader/Cache/small.bed` |
+//! | AWS S3        | `s3://bedreader/v1/toydata.5chrom.bed` |
+//!
+//! Note: For local files, use the [`abs_path_to_url_string`](fn.abs_path_to_url_string.html) function to properly encode into a URL.
+//! 
+//! ## Options
+//!
+//! | Cloud Service | Example |
+//! | -------- | ----------- |
+//! | HTTP | `[("timeout", "30s")]` |
+//! | local file | *none* |
+//! | AWS S3 | `[("aws_region", "us-west-2"), ("aws_access_key_id",` ...`), ("aws_secret_access_key",` ...`)]` |
+//!
+//! ## High-Level `CloudFile` Methods
 //!
 //! | Method | Description |
 //! | -------- | ----------- |
-//! | [`get`](struct.CloudFile.html#method.iid_count) | Number of individuals (samples) |
-//! | [`clone`](struct.CloudFile.html#method.sid_count) | Number of SNPs (variants) |
-//! | [`cmk`](struct.CloudFile.html#method.dim) | Number of individuals and SNPs |
-//! cmk also give a table of common urls and options
-//!
-//! ### `ReadOptions`
-//!
-//! When using [`ReadOptions::builder`](struct.ReadOptions.html#method.builder) to read genotype data, use these options to
-//! specify a desired numeric type,
-//! which individuals (samples) to read, which SNPs (variants) to read, etc.
-//!
-//! | Option | Description |
+//! | [`open`](struct.CloudFile.html#method.open) | Open the file to read as a stream of bytes. |
+//! | [`bytes`](struct.CloudFile.html#method.bytes) | Read the whole file into an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html). |
+//! | [`range_and_size`](struct.CloudFile.html#method.range_and_size) | Retrieve a range of bytes and the file's total size. |
+//! | [`ranges`](struct.CloudFile.html#method.ranges) | Return the bytes that are stored at the specified location(s) in the given byte ranges. |
+//! | [`clone`](struct.CloudFile.html#method.clone) | Clone the [`CloudFile`](struct.CloudFile.html). By design, this is efficient. |
+//! | [`size`](struct.CloudFile.html#method.size) | Return the size of a file stored in the cloud. |
+//! | [`line_count`](struct.CloudFile.html#method.line_count) | Count the lines in a file stored in the cloud. |
+//! | [`set_extension`](struct.CloudFile.html#method.set_extension) | Updates the [`CloudFile`](struct.CloudFile.html) in place to have the given extension. |
+//! 
+//! ## Low-Level `CloudFile` Methods
+//! 
+//! | Method | Description |
 //! | -------- | ----------- |
-//! | [`i8`](struct.ReadOptionsBuilder.html#method.i8) | Read values as i8 |
-//! | [`f32`](struct.ReadOptionsBuilder.html#method.f32) | Read values as f32 |
-//! | [`f64`](struct.ReadOptionsBuilder.html#method.f64) | Read values as f64 |
-//! | [`iid_index`](struct.ReadOptionsBuilder.html#method.iid_index) | Index of individuals (samples) to read (defaults to all)|
-//! | [`sid_index`](struct.ReadOptionsBuilder.html#method.sid_index) | Index of SNPs (variants) to read (defaults to all) |
-//! | [`f`](struct.ReadOptionsBuilder.html#method.f) | Order of the output array, Fortran-style (default) |
-//! | [`c`](struct.ReadOptionsBuilder.html#method.c) | Order of the output array, C-style |
-//! | [`is_f`](struct.ReadOptionsBuilder.html#method.is_f) | Is order of the output array Fortran-style? (defaults to true)|
-//! | [`missing_value`](struct.ReadOptionsBuilder.html#method.missing_value) | Value to use for missing values (defaults to -127 or NaN) |
-//! | [`count_a1`](struct.ReadOptionsBuilder.html#method.count_a1) | Count the number allele 1 (default) |
-//! | [`count_a2`](struct.ReadOptionsBuilder.html#method.count_a2) | Count the number allele 2 |
-//! | [`is_a1_counted`](struct.ReadOptionsBuilder.html#method.is_a1_counted) | Is allele 1 counted? (defaults to true) |
-//! | [`num_threads`](struct.ReadOptionsBuilder.html#method.num_threads) | Number of threads to use (defaults to all processors) |
-//! | [`max_concurrent_requests`](struct.ReadOptionsBuilder.html#method.max_concurrent_requests) | Maximum number of concurrent async requests (defaults to 10) -- Used by [`BedCloud`](struct.BedCloud.html). |
-//! | [`max_chunk_size`](struct.ReadOptionsBuilder.html#method.max_chunk_size) | Maximum chunk size of async requests (defaults to 8_000_000 bytes) -- Used by [`BedCloud`](struct.BedCloud.html). |
+//! | [`get`](struct.CloudFile.html#method.get) | Do a 'get' with the powerful [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get) crate. |
+//! | [`get_opts`](struct.CloudFile.html#method.get_opts) | Do a 'get_opts' with the powerful [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate. |
+//! 
+//! ## Lowest-Level Methods
+//! 
+//! You can call any method from the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) crate. For example, here we
+//! use [`head`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#tymethod.head) to get the metadata for a file and the last_modified time.
+//! 
+//! ```
+//! use cloud_file::CloudFile;
 //!
-//! ### [`Index`](enum.Index.html) Expressions
-//!
-//! Select which individuals (samples) and SNPs (variants) to read by using these
-//! [`iid_index`](struct.ReadOptionsBuilder.html#method.iid_index) and/or
-//! [`sid_index`](struct.ReadOptionsBuilder.html#method.sid_index) expressions.
-//!
-//! | Example | Type | Description |
-//! | -------- | --- | ----------- |
-//! | nothing | `()` | All |
-//! | `2` | `isize` | Index position 2 |
-//! | `-1` | `isize` | Last index position |
-//! | `vec![0, 10, -2]` | `Vec<isize>` | Index positions 0, 10, and 2nd from last |
-//! | `[0, 10, -2]` | `[isize]` and `[isize;n]` | Index positions 0, 10, and 2nd from last |
-//! | `ndarray::array![0, 10, -2]` | `ndarray::Array1<isize>` | Index positions 0, 10, and 2nd from last |
-//! | `10..20` | `Range<usize>` | Index positions 10 (inclusive) to 20 (exclusive). *Note: Rust ranges don't support negatives* |
-//! | `..=19` | `RangeInclusive<usize>` | Index positions 0 (inclusive) to 19 (inclusive). *Note: Rust ranges don't support negatives* |
-//! | *any Rust ranges* | `Range*<usize>` | *Note: Rust ranges don't support negatives* |
-//! | `s![10..20;2]` | `ndarray::SliceInfo1` | Index positions 10 (inclusive) to 20 (exclusive) in steps of 2 |
-//! | `s![-20..-10;-2]` | `ndarray::SliceInfo1` | 10th from last (exclusive) to 20th from last (inclusive), in steps of -2 |
-//! | `vec![true, false, true]` | `Vec<bool>`| Index positions 0 and 2. |
-//! | `[true, false, true]` | `[bool]` and `[bool;n]`| Index positions 0 and 2.|
-//! | `ndarray::array![true, false, true]` | `ndarray::Array1<bool>`| Index positions 0 and 2.|
-//!
-//! ### Environment Variables
-//!
-//! * `BED_READER_NUM_THREADS`
-//! * `NUM_THREADS`
-//!
-//! If [`ReadOptionsBuilder::num_threads`](struct.ReadOptionsBuilder.html#method.num_threads)
-//! or [`WriteOptionsBuilder::num_threads`](struct.WriteOptionsBuilder.html#method.num_threads) is not specified,
-//! the number of threads to use is determined by these environment variable (in order of priority):
-//! If neither of these environment variables are set, all processors are used.
-//!
-//! * `BED_READER_DATA_DIR`
-//!
-//! Any requested sample file will be downloaded to this directory. If the environment variable is not set,
-//! a cache folder, appropriate to the OS, will be used.
+//! # Runtime::new().unwrap().block_on(async {
+//! let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+//! let cloud_file = CloudFile::new(url)?;
+//! let meta = cloud_file.cloud_service.head(&cloud_file.store_path).await?;
+//! let last_modified = meta.last_modified;
+//! println!("last_modified: {}", last_modified);
+//! assert_eq!(meta.size, 303);
+//! # Ok::<(), CloudFileError>(())}).unwrap();
+//! # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+//! ```
 
-// cmk like bed-reader, but with links to examples and maybe supplemental doc
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("This code requires a 64-bit target architecture.");
 
 use bytes::Bytes;
 use core::fmt;
@@ -146,16 +131,11 @@ impl Clone for CloudFile {
     }
 }
 
-// cmk update reference
-/// An empty set of [cloud options](supplemental_document_options/index.html#cloud-options)
-///
-/// See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for examples.
+/// An empty set of cloud options
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
 impl CloudFile {
     /// Create a new [`CloudFile`] from a URL string.
-    ///
-    /// cmk See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
     ///
     /// # Example
     /// ```
@@ -183,8 +163,6 @@ impl CloudFile {
     }
 
     /// Create a new [`CloudFile`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
-    ///
-    /// cmk See ["Cloud URLs and `CloudFile` Examples"](supplemental_document_cloud_urls/index.html) for details specifying a file.
     ///
     /// # Example
     /// ```
@@ -434,7 +412,7 @@ impl CloudFile {
     ///
     /// ```rust
     /// use cloud_file::CloudFile;
-    /// use futures::StreamExt; // let's us call 'next' on a stream
+    /// use futures::StreamExt; // Enables `.next()` on streams.
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
@@ -689,9 +667,6 @@ fn readme_1() {
 }
 
 // cmk need README.md etc.
-// cmk set up the warnings for missing docs, etc
-// cmk add 64-bit test
-// cmk how can docs reference examples?
 // cmk make an example (and/or a method) for random region reading.
 // cmk limitations: no writing, no directories, no in-memory support, a bit-less efficient than generics,
 // cmk limitations: no option of which services, makes non-url usage awkward.

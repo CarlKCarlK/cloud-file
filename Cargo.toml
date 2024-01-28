@@ -2,7 +2,7 @@
 name = "cloud-file"
 version = "0.1.0"
 edition = "2021"
-description = "Simplified reading of cloud files in Rust"
+description = "Simple reading of cloud files in Rust"
 repository = "https://github.com/CarlKCarlK/cloud-file"
 readme = "README.md"
 documentation = "https://docs.rs/cloud-file/latest/cloud-file/"
