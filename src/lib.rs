@@ -40,6 +40,7 @@
 //! | Method | Description |
 //! | -------- | ----------- |
 //! | [`open`](struct.CloudFile.html#method.open) | Open the file to read as a stream of bytes. |
+//! | [`line_chunks`](struct.CloudFile.html#method.line_chunks) | Opens a file to read binary chunks of one or more lines, that is, each chunk ends with a newline. |
 //! | [`bytes`](struct.CloudFile.html#method.bytes) | Read the whole file into an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html). |
 //! | [`range_and_size`](struct.CloudFile.html#method.range_and_size) | Retrieve a range of bytes and the file's total size. |
 //! | [`ranges`](struct.CloudFile.html#method.ranges) | Return the bytes that are stored at the specified location(s) in the given byte ranges. |
@@ -78,6 +79,7 @@
 compile_error!("This code requires a 64-bit target architecture.");
 
 use bytes::Bytes;
+use object_store::delimited::newline_delimited_stream;
 use core::fmt;
 use futures_util::stream::BoxStream;
 use futures_util::TryStreamExt;
@@ -439,6 +441,50 @@ impl CloudFile {
         Ok(stream)
     }
 
+    ///  Opens a file to read binary chunks of one or more lines, that is, each chunk ends with a newline.
+    ///
+    /// # Example
+    ///
+    /// Return the 12th line of a file.
+    ///
+    /// ```rust
+    /// use cloud_file::CloudFile;
+    /// use futures::StreamExt; // Enables `.next()` on streams.
+    /// use std::str::from_utf8;
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    /// let goal_index = 12;
+    ///
+    /// let cloud_file = CloudFile::new(url)?;
+    /// let mut line_chunks = cloud_file.line_chunks().await?;
+    /// let mut index_iter = 0..;
+    /// let mut goal_line = None;
+    /// 'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
+    ///     let line_chunk = line_chunk?;
+    ///     let lines = from_utf8(&line_chunk)?.split_terminator('\n');
+    ///     for line in lines {
+    ///         let index = index_iter.next().unwrap(); // Safe because the iterator is infinite
+    ///         if index == goal_index {
+    ///             goal_line = Some(line.to_string());
+    ///             break 'outer_loop;
+    ///         }
+    ///     }
+    /// }
+    /// assert_eq!(goal_line, Some("per12 per12 0 0 2 -0.0382707".to_string()));
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
+    ///
+    pub async fn line_chunks(
+        &self,
+    ) -> Result<BoxStream<'static, object_store::Result<Bytes>>, CloudFileError> {
+        let stream = self.open().await?;
+        let line_chunks = newline_delimited_stream(stream);
+        Ok(Box::pin(line_chunks))
+    }
+
+
     /// Updates the [`CloudFile`] in place to have the given extension.
     ///
     /// It removes the current extension, if any.
@@ -576,6 +622,10 @@ pub enum CloudFileError {
     #[error("Object store path error: {0}")]
     ObjectStorePathError(#[from] object_store::path::Error),
 
+    /// An error related to converting bytes into UTF-8
+    #[error("UTF-8 error: {0}")]
+    Utf8Error(#[from] std::str::Utf8Error),
+
     /// An error related to parsing a URL string
     #[error("Cannot parse URL: {0} {1}")]
     CannotParseUrl(String, String),
@@ -594,6 +644,35 @@ async fn cloud_file_2() -> Result<(), CloudFileError> {
     assert_eq!(cloud_file.size().await?, 303);
     Ok(())
 }
+
+#[tokio::test]
+async fn line_n() -> Result<(), CloudFileError> {
+    use std::str::from_utf8;
+    use futures_util::StreamExt;
+
+    let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    let goal_index = 12;
+
+    let cloud_file = CloudFile::new(url)?;
+    let mut line_chunks = cloud_file.line_chunks().await?;
+    let mut index_iter = 0..;
+    let mut goal_line = None;
+    'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
+        let line_chunk = line_chunk?;
+        let lines = from_utf8(&line_chunk)?.split_terminator('\n');
+        for line in lines {
+            let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
+            if index == goal_index {
+                goal_line = Some(line.to_string());
+                break 'outer_loop;
+            }
+        }
+    }
+
+    assert_eq!(goal_line, Some("per12 per12 0 0 2 -0.0382707".to_string()));
+    Ok(())
+}
+
 
 #[tokio::test]
 async fn cloud_file_extension() -> Result<(), CloudFileError> {

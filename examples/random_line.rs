@@ -1,7 +1,8 @@
+use std::str::from_utf8;
+
 use anyhow::anyhow;
 use cloud_file::CloudFile;
-use futures::{pin_mut, StreamExt};
-use object_store::delimited::newline_delimited_stream;
+use futures::StreamExt;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String, anyhow::Error> {
@@ -10,18 +11,15 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
     } else {
         StdRng::from_entropy()
     };
+
     let mut selected_line = None;
 
-    let stream = cloud_file.open().await?;
-    let line_chunk_stream = newline_delimited_stream(stream);
-    // Fixes a compiler error by pinning the stream on the stack for an async operation.
-    pin_mut!(line_chunk_stream);
-
+    // Each binary line_chunk contains one or more lines, that is, each chunk ends with a newline.
+    let mut line_chunks = cloud_file.line_chunks().await?;
     let mut index_iter = 0..;
-    while let Some(line_chunk) = line_chunk_stream.next().await {
+    while let Some(line_chunk) = line_chunks.next().await {
         let line_chunk = line_chunk?;
-        let lines = std::str::from_utf8(&line_chunk)?.split_terminator('\n');
-
+        let lines = from_utf8(&line_chunk)?.split_terminator('\n');
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
 
@@ -38,9 +36,8 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let cloud_file = CloudFile::new(
-        "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam",
-    )?;
+    let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
+    let cloud_file = CloudFile::new(url)?;
     let line = random_line(&cloud_file, None).await?;
     println!("random line: {line}");
     Ok(())
