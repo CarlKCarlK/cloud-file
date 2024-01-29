@@ -764,4 +764,3 @@ fn readme_1() {
         .unwrap();
 }
 
-// cmk be sure to turn on discussion

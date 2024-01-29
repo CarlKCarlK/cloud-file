@@ -65,7 +65,7 @@ assert_eq!(newline_count, 500);
 # use {cloud_file::CloudFileError, tokio::runtime::Runtime};   
 ```
 
-More examples cmk test these in ci
+More examples
 --------------
 
 | Example                                       | Description                                   |
