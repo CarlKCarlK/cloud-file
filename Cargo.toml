@@ -8,7 +8,7 @@ readme = "README.md"
 documentation = "https://docs.rs/cloud-file/latest/cloud-file/"
 authors = ["Carl Kadie"]
 license = "MIT OR Apache-2.0"
-keywords = ["cloud", "file", "storage", "aws", "azure", "gcp", "s3", "blob", "object", "async", "io", "http", "non-blocking"]
+keywords = ["cloud", "file", "http","aws", "azure"]
 categories = ["Web Programming::HTTP Client", "Filesystem", "API bindings"]
 homepage = "https://github.com/CarlKCarlK/cloud-file"
 

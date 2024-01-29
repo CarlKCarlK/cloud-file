@@ -35,14 +35,14 @@ Find the size of a cloud file.
 
 ```rust
 use cloud_file::CloudFile;
-# Runtime::new().unwrap().block_on(async {
+# Runtime::new().unwrap().block_on(async {  // '#' needed for doctest
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new(url)?;
 let size = cloud_file.size().await?;
 assert_eq!(size, 14_361);
 # Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();
-# use {cloud_file::CloudFileError, tokio::runtime::Runtime}; // '#' needed for doctest
+# use {cloud_file::CloudFileError, tokio::runtime::Runtime};
 ```
 
 Find the number of lines in a cloud file.
