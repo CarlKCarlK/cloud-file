@@ -720,9 +720,15 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
 /// ```
 /// use cloud_file::abs_path_to_url_string;
 /// 
+/// #[cfg(target_os = "windows")]
 /// let file_name = r"M:\data files\small.bed";
+/// #[cfg(not(target_os = "windows"))]
+/// let file_name = r"/data files/small.bed";
 /// let url = abs_path_to_url_string(file_name)?;
+/// #[cfg(target_os = "windows")]
 /// assert_eq!(url, "file:///M:/data%20files/small.bed");
+/// #[cfg(not(target_os = "windows"))]
+/// assert_eq!(url, "file:///data%20files/small.bed");
  /// # use cloud_file::CloudFileError;
  /// # Ok::<(), CloudFileError>(())
  /// ```
@@ -757,12 +763,5 @@ fn readme_1() {
         })
         .unwrap();
 }
-
-// #[test]
-// fn temp_cmk() {
-//     let file_name = r"M:\data files\small.bed";
-//     let url = abs_path_to_url_string(file_name).unwrap();
-//     println!("{url}");
-// }
 
 // cmk be sure to turn on discussion
