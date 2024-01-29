@@ -70,7 +70,7 @@ More examples cmk test these in ci
 
 | Example                                       | Description                                   |
 |-----------------------------------------------|-----------------------------------------------|
-| [`line_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file as binary chunks.  |
+| [`line_count`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file as binary chunks.  |
 | [`random_line`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_line.rs)   | Read a file as text lines.        |
 | [`bigram_counts`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/bigram_counts.rs) | Read random regions of a file, without regard to order.   |
 | [`aws_file_size`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/aws_file_size.rs) | Find the size of a file on AWS.   |

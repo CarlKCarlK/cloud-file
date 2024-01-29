@@ -37,5 +37,5 @@ jobs:
         run: |
           cargo run --verbose --example aws_file_size
           cargo run --verbose --example bigram_counts
-          cargo run --verbose --example line_counts
+          cargo run --verbose --example line_count
           cargo run --verbose --example random_line          
