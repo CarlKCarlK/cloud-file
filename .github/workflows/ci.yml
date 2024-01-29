@@ -34,8 +34,8 @@ jobs:
           cargo clippy --verbose -- -D clippy::all
           cargo test --verbose
       - name: Run Examples
-      run: |
-        cargo run --verbose --example aws_file_size
-        cargo run --verbose --example bigram_counts
-        cargo run --verbose --example line_counts
-        cargo run --verbose --example random_line          
+        run: |
+          cargo run --verbose --example aws_file_size
+          cargo run --verbose --example bigram_counts
+          cargo run --verbose --example line_counts
+          cargo run --verbose --example random_line          
