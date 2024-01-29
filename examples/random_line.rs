@@ -1,9 +1,8 @@
-use std::str::from_utf8;
-
 use anyhow::anyhow;
 use cloud_file::CloudFile;
 use futures::StreamExt;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::str::from_utf8;
 
 async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String, anyhow::Error> {
     let mut rng = if let Some(s) = seed {

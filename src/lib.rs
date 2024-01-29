@@ -22,41 +22,44 @@
 //! | Cloud Service | Example |
 //! | ------------- | ------- |
 //! | HTTP          | `https://www.gutenberg.org/cache/epub/100/pg100.txt` |
-//! | local file    | `file:///C:/Users/carlk/AppData/Local/bed_reader/bed_reader/Cache/small.bed` |
+//! | local file    | `file:///M:/data%20files/small.bed` |
 //! | AWS S3        | `s3://bedreader/v1/toydata.5chrom.bed` |
 //!
 //! Note: For local files, use the [`abs_path_to_url_string`](fn.abs_path_to_url_string.html) function to properly encode into a URL.
 //! 
 //! ## Options
 //!
-//! | Cloud Service | Example |
-//! | -------- | ----------- |
-//! | HTTP | `[("timeout", "30s")]` |
-//! | local file | *none* |
-//! | AWS S3 | `[("aws_region", "us-west-2"), ("aws_access_key_id",` ...`), ("aws_secret_access_key",` ...`)]` |
+//! | Cloud Service | Details | Example |
+//! | -------- | ------- | ----------- |
+//! | HTTP | [`ClientConfigKey`](https://docs.rs/object_store/latest/object_store/enum.ClientConfigKey.html#variant.Timeout) | `[("timeout", "30s")]` |
+//! | local file | *none* | |
+//! | AWS S3 | [`AmazonS3ConfigKey`](https://docs.rs/object_store/latest/object_store/aws/enum.AmazonS3ConfigKey.html) | `[("aws_region", "us-west-2"), ("aws_access_key_id",` ...`), ("aws_secret_access_key",` ...`)]` |
+//! | Azure | [`AzureConfigKey`](https://docs.rs/object_store/latest/object_store/azure/enum.AzureConfigKey.html) |  |
+//! | Google | [`GoogleConfigKey`](https://docs.rs/object_store/latest/object_store/gcp/enum.GoogleConfigKey.html) |  |
+//! 
 //!
-//! ## High-Level `CloudFile` Methods
+//! ## High-Level [`CloudFile`](struct.CloudFile.html) Methods
 //!
 //! | Method | Description |
 //! | -------- | ----------- |
 //! | [`open`](struct.CloudFile.html#method.open) | Open the file to read as a stream of bytes. |
 //! | [`line_chunks`](struct.CloudFile.html#method.line_chunks) | Opens a file to read binary chunks of one or more lines, that is, each chunk ends with a newline. |
 //! | [`bytes`](struct.CloudFile.html#method.bytes) | Read the whole file into an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html). |
-//! | [`range_and_size`](struct.CloudFile.html#method.range_and_size) | Retrieve a range of bytes and the file's total size. |
-//! | [`ranges`](struct.CloudFile.html#method.ranges) | Return the bytes that are stored at the specified location(s) in the given byte ranges. |
+//! | [`range_and_file_size`](struct.CloudFile.html#method.range_and_file_size) | Retrieve a range of bytes and the file's total size. |
+//! | [`ranges`](struct.CloudFile.html#method.ranges) | Return the bytes found in the specified ranges. |
 //! | [`clone`](struct.CloudFile.html#method.clone) | Clone the [`CloudFile`](struct.CloudFile.html). By design, this is efficient. |
 //! | [`size`](struct.CloudFile.html#method.size) | Return the size of a file stored in the cloud. |
 //! | [`line_count`](struct.CloudFile.html#method.line_count) | Count the lines in a file stored in the cloud. |
-//! | [`set_extension`](struct.CloudFile.html#method.set_extension) | Updates the [`CloudFile`](struct.CloudFile.html) in place to have the given extension. |
+//! | [`set_extension`](struct.CloudFile.html#method.set_extension) | Change the [`CloudFile`]'s extension (in place). |
 //! 
-//! ## Low-Level `CloudFile` Methods
+//! ## Low-Level [`CloudFile`](struct.CloudFile.html) Methods
 //! 
 //! | Method | Description |
 //! | -------- | ----------- |
-//! | [`get`](struct.CloudFile.html#method.get) | Do a 'get' with the powerful [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get) crate. |
-//! | [`get_opts`](struct.CloudFile.html#method.get_opts) | Do a 'get_opts' with the powerful [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate. |
+//! | [`get`](struct.CloudFile.html#method.get) | Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get) crate's `get` method. |
+//! | [`get_opts`](struct.CloudFile.html#method.get_opts) | Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate's `get_opts` method. |
 //! 
-//! ## Lowest-Level Methods
+//! ## Lowest-Level [`CloudFile`](struct.CloudFile.html) Methods
 //! 
 //! You can call any method from the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) crate. For example, here we
 //! use [`head`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#tymethod.head) to get the metadata for a file and the last_modified time.
@@ -164,7 +167,7 @@ impl CloudFile {
         Ok(cloud_file)
     }
 
-    /// Create a new [`CloudFile`] from a URL string and [cloud options](supplemental_document_options/index.html#cloud-options).
+    /// Create a new [`CloudFile`] from a URL string and options.
     ///
     /// # Example
     /// ```
@@ -243,7 +246,7 @@ impl CloudFile {
         Ok(meta.size)
     }
 
-    /// Return the bytes that are stored at the specified location(s) in the given byte ranges
+    /// Return the bytes found in the specified ranges.
     ///
     /// # Example
     /// ```
@@ -254,8 +257,8 @@ impl CloudFile {
     /// let cloud_file = CloudFile::new(url)?;
     /// let byte_vec = cloud_file.ranges(&[0..10, 1000..1010]).await?;
     /// assert_eq!(byte_vec.len(), 2);
-    /// assert_eq!(*byte_vec[0], *b"1\t1:1:A:C\t");
-    /// assert_eq!(*byte_vec[1], *b":A:C\t0.0\t4");
+    /// assert_eq!(byte_vec[0].as_ref(), b"1\t1:1:A:C\t");
+    /// assert_eq!(byte_vec[1].as_ref(), b":A:C\t0.0\t4");
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
@@ -266,9 +269,9 @@ impl CloudFile {
             .await?)
     }
 
-    /// Do a 'get' using an [`object_store::GetOptions`](https://docs.rs/object_store/latest/object_store/struct.GetOptions.html)
-    /// from the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate. You
-    /// can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
+    /// Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate's `get_opts` method.
+    /// 
+    /// You can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
     /// result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html).
     ///
     /// # Example
@@ -317,7 +320,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url)?;
-    /// let (bytes, size) = cloud_file.range_and_size(0..3).await?;
+    /// let (bytes, size) = cloud_file.range_and_file_size(0..3).await?;
     /// assert_eq!(bytes[0], 0x6c);
     /// assert_eq!(bytes[1], 0x1b);
     /// assert_eq!(bytes[2], 0x01);
@@ -325,7 +328,7 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn range_and_size(
+    pub async fn range_and_file_size(
         &self,
         range: Range<usize>,
     ) -> Result<(Bytes, usize), CloudFileError> {
@@ -345,7 +348,8 @@ impl CloudFile {
         Ok((bytes, size))
     }
 
-    /// Do a 'get' with the powerful [`object_store`](https://github.com/apache/arrow-rs/tree/master/object_store) crate.
+    /// Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get) crate's `get` method.
+    ///
     /// The result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html) which can,
     /// for example, be converted into a stream of bytes.
     ///
@@ -365,8 +369,7 @@ impl CloudFile {
     /// let mut newline_count: usize = 0;
     /// while let Some(bytes) = stream.next().await {
     ///     let bytes = bytes?;
-    ///     let count = bytecount::count(&bytes, b'\n');
-    ///     newline_count += count;
+    ///     newline_count += bytecount::count(&bytes, b'\n');
     ///     }
     /// assert_eq!(newline_count, 500);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -423,8 +426,7 @@ impl CloudFile {
     /// let mut newline_count: usize = 0;
     /// while let Some(bytes) = stream.next().await {
     ///     let bytes = bytes?;
-    ///     let count = bytecount::count(&bytes, b'\n');
-    ///     newline_count += count;
+    ///     newline_count += bytecount::count(&bytes, b'\n');
     ///     }
     /// assert_eq!(newline_count, 500);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -441,7 +443,7 @@ impl CloudFile {
         Ok(stream)
     }
 
-    ///  Opens a file to read binary chunks of one or more lines, that is, each chunk ends with a newline.
+    ///  Open a file to read binary chunks of one or more lines, that is, each chunk ends with a newline.
     ///
     /// # Example
     ///
@@ -485,7 +487,7 @@ impl CloudFile {
     }
 
 
-    /// Updates the [`CloudFile`] in place to have the given extension.
+    /// Change the [`CloudFile`]'s extension (in place).
     ///
     /// It removes the current extension, if any.
     /// It appends the given extension, if any.
@@ -500,6 +502,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let mut cloud_file = CloudFile::new(url)?;
+    /// assert_eq!(cloud_file.size().await?, 303);
     /// cloud_file.set_extension("fam")?;
     /// assert_eq!(cloud_file.size().await?, 130);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -711,7 +714,18 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
     Ok(())
 }
 
-/// Returns a local file's absolute path as a URL string, taking care of any needed encoding.
+/// Given a local file's absolute path, return a URL string to that file.
+/// 
+/// # Example
+/// ```
+/// use cloud_file::abs_path_to_url_string;
+/// 
+/// let file_name = r"M:\data files\small.bed";
+/// let url = abs_path_to_url_string(file_name)?;
+/// assert_eq!(url, "file:///M:/data%20files/small.bed");
+ /// # use cloud_file::CloudFileError;
+ /// # Ok::<(), CloudFileError>(())
+ /// ```
 pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFileError> {
     let path = path.as_ref();
     let url = Url::from_file_path(path)
@@ -736,8 +750,7 @@ fn readme_1() {
             let mut newline_count: usize = 0;
             while let Some(bytes) = stream.next().await {
                 let bytes = bytes?;
-                let count = bytecount::count(&bytes, b'\n');
-                newline_count += count;
+                newline_count += bytecount::count(&bytes, b'\n');
             }
             assert_eq!(newline_count, 500);
             Ok::<(), CloudFileError>(())
@@ -745,8 +758,11 @@ fn readme_1() {
         .unwrap();
 }
 
-// cmk need README.md etc.
-// cmk make an example (and/or a method) for random region reading.
-// cmk limitations: no writing, no directories, no in-memory support, a bit-less efficient than generics,
-// cmk limitations: no option of which services, makes non-url usage awkward.
+// #[test]
+// fn temp_cmk() {
+//     let file_name = r"M:\data files\small.bed";
+//     let url = abs_path_to_url_string(file_name).unwrap();
+//     println!("{url}");
+// }
+
 // cmk be sure to turn on discussion

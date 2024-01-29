@@ -36,7 +36,7 @@ async fn count_bigrams(
         async move { cloud_file.ranges(chunk).await }
     });
 
-    // Create a stream of futures to run out-of-order and with limited concurrency.
+    // Create a stream of futures to run out-of-order and with constrained concurrency.
     let work_chunks_stream =
         futures_util::stream::iter(work_chunks_iterator).buffer_unordered(max_concurrent_requests);
     pin_mut!(work_chunks_stream);
@@ -72,7 +72,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let seed = Some(0u64);
     let sample_count = 10_000;
-    let max_chunk_bytes = 500; // 8_000_000 is a good default
+    let max_chunk_bytes = 500; // 8_000_000 is a good default when chunks are bigger.
     let max_concurrent_requests = 10; // 10 is a good default
 
     count_bigrams(
