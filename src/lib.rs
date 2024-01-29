@@ -39,19 +39,27 @@
 //! 
 //!
 //! ## High-Level [`CloudFile`](struct.CloudFile.html) Methods
-//!
-//! | Method | Description |
-//! | -------- | ----------- |
-//! | [`open`](struct.CloudFile.html#method.open) | Open the file to read as a stream of bytes. |
-//! | [`line_chunks`](struct.CloudFile.html#method.line_chunks) | Opens a file to read binary chunks of one or more lines, that is, each chunk ends with a newline. |
-//! | [`bytes`](struct.CloudFile.html#method.bytes) | Read the whole file into an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html). |
-//! | [`range_and_file_size`](struct.CloudFile.html#method.range_and_file_size) | Retrieve a range of bytes and the file's total size. |
-//! | [`ranges`](struct.CloudFile.html#method.ranges) | Return the bytes found in the specified ranges. |
-//! | [`clone`](struct.CloudFile.html#method.clone) | Clone the [`CloudFile`](struct.CloudFile.html). By design, this is efficient. |
-//! | [`size`](struct.CloudFile.html#method.size) | Return the size of a file stored in the cloud. |
-//! | [`line_count`](struct.CloudFile.html#method.line_count) | Count the lines in a file stored in the cloud. |
-//! | [`set_extension`](struct.CloudFile.html#method.set_extension) | Change the [`CloudFile`]'s extension (in place). |
 //! 
+//! These methods retrieve a stream, do a one-shot read, or count.
+//! 
+//! | Method                        | Retrieves                                                                                                  |
+//! |-------------------------------|-------------------------------------------------------------------|
+//! | [`stream_chunks`](struct.CloudFile.html#method.stream_chunks)       | File contents as a stream of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) |
+//! | [`stream_line_chunks`](struct.CloudFile.html#method.stream_line_chunks) | File contents as a stream of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html), each containing one or more whole lines |
+//! | [`read_all`](struct.CloudFile.html#method.read_all)                | Whole file contents as an in-memory [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) |
+//! | [`read_range`](struct.CloudFile.html#method.read_range)            | [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from a specified range |
+//! | [`read_ranges`](struct.CloudFile.html#method.read_ranges)          | `Vec` of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from specified ranges |
+//! | [`read_range_and_file_size`](struct.CloudFile.html#method.read_range_and_file_size) | [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from a specified range & the file's size |
+//! | [`read_file_size`](struct.CloudFile.html#method.read_file_size)    | Size of the file                                     |
+//! | [`count_lines`](struct.CloudFile.html#method.count_lines)          | Number of lines in the file                          |
+//! 
+//! Additional methods:
+//! 
+//! | Method                        | Description                                                                                                  |
+//! |-------------------------------|-------------------------------------------------------------------|
+//! | [`clone`](struct.CloudFile.html#method.clone)                      | Clone the [`CloudFile`](struct.CloudFile.html) instance. Efficient by design. |
+//! | [`set_extension`](struct.CloudFile.html#method.set_extension)      | Change the [`CloudFile`](struct.CloudFile.html)'s file extension (in place).  |
+//!
 //! ## Low-Level [`CloudFile`](struct.CloudFile.html) Methods
 //! 
 //! | Method | Description |
@@ -111,7 +119,7 @@ use url::Url;
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
 /// let cloud_file = CloudFile::new(url)?;
-/// assert_eq!(cloud_file.size().await?, 303);
+/// assert_eq!(cloud_file.read_file_size().await?, 303);
 /// # Ok::<(), CloudFileError>(())}).unwrap();
 /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
 /// ```
@@ -137,6 +145,18 @@ impl Clone for CloudFile {
 }
 
 /// An empty set of cloud options
+/// 
+/// # Example
+/// ```
+/// use cloud_file::{EMPTY_OPTIONS, CloudFile};
+/// 
+/// # Runtime::new().unwrap().block_on(async {
+/// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+/// let cloud_file = CloudFile::new_with_options(url, EMPTY_OPTIONS)?;
+/// assert_eq!(cloud_file.read_file_size().await?, 303);
+/// # Ok::<(), CloudFileError>(())}).unwrap();
+/// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+/// ```
 pub const EMPTY_OPTIONS: [(&str, String); 0] = [];
 
 impl CloudFile {
@@ -149,7 +169,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url)?;
-    /// assert_eq!(cloud_file.size().await?, 303);
+    /// assert_eq!(cloud_file.read_file_size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
@@ -176,7 +196,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
-    /// assert_eq!(cloud_file.size().await?, 303);
+    /// assert_eq!(cloud_file.read_file_size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
@@ -211,12 +231,12 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.fam";
     /// let cloud_file = CloudFile::new(url)?;
-    /// assert_eq!(cloud_file.line_count().await?, 10);
+    /// assert_eq!(cloud_file.count_lines().await?, 10);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn line_count(&self) -> Result<usize, CloudFileError> {
-        let stream = self.open().await?;
+    pub async fn count_lines(&self) -> Result<usize, CloudFileError> {
+        let stream = self.stream_chunks().await?;
 
         let newline_count = stream
             .try_fold(0, |acc, bytes| async move {
@@ -237,16 +257,16 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url)?;
-    /// assert_eq!(cloud_file.size().await?, 303);
+    /// assert_eq!(cloud_file.read_file_size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn size(&self) -> Result<usize, CloudFileError> {
+    pub async fn read_file_size(&self) -> Result<usize, CloudFileError> {
         let meta = self.cloud_service.head(&self.store_path).await?;
         Ok(meta.size)
     }
 
-    /// Return the bytes found in the specified ranges.
+    /// Return the [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from a specified range.
     ///
     /// # Example
     /// ```
@@ -255,14 +275,35 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
     /// let cloud_file = CloudFile::new(url)?;
-    /// let byte_vec = cloud_file.ranges(&[0..10, 1000..1010]).await?;
-    /// assert_eq!(byte_vec.len(), 2);
-    /// assert_eq!(byte_vec[0].as_ref(), b"1\t1:1:A:C\t");
-    /// assert_eq!(byte_vec[1].as_ref(), b":A:C\t0.0\t4");
+    /// let bytes = cloud_file.read_range((0..10)).await?;
+    /// assert_eq!(bytes.as_ref(), b"1\t1:1:A:C\t");
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
+    pub async fn read_range(&self, range: Range<usize>) -> Result<Bytes, CloudFileError> {
+        Ok(self
+            .cloud_service
+            .get_range(&self.store_path, range)
+            .await?)
+    }    
+
+    /// Return the `Vec` of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from specified ranges.
+    ///
+    /// # Example
+    /// ```
+    /// use cloud_file::CloudFile;
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bim";
+    /// let cloud_file = CloudFile::new(url)?;
+    /// let bytes_vec = cloud_file.read_ranges(&[0..10, 1000..1010]).await?;
+    /// assert_eq!(bytes_vec.len(), 2);
+    /// assert_eq!(bytes_vec[0].as_ref(), b"1\t1:1:A:C\t");
+    /// assert_eq!(bytes_vec[1].as_ref(), b":A:C\t0.0\t4");
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
+    pub async fn read_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
         Ok(self
             .cloud_service
             .get_ranges(&self.store_path, ranges)
@@ -308,7 +349,7 @@ impl CloudFile {
             .await?)
     }
 
-    /// Retrieve a range of bytes and the file's total size.
+    /// Retrieve the [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from a specified range & the file's size.
     ///
     /// # Example
     ///
@@ -320,7 +361,7 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url)?;
-    /// let (bytes, size) = cloud_file.range_and_file_size(0..3).await?;
+    /// let (bytes, size) = cloud_file.read_range_and_file_size (0..3).await?;
     /// assert_eq!(bytes[0], 0x6c);
     /// assert_eq!(bytes[1], 0x1b);
     /// assert_eq!(bytes[2], 0x01);
@@ -328,7 +369,7 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn range_and_file_size(
+    pub async fn read_range_and_file_size (
         &self,
         range: Range<usize>,
     ) -> Result<(Bytes, usize), CloudFileError> {
@@ -392,23 +433,24 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
     /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
-    /// let bytes = cloud_file.bytes().await?;
-    /// let newline_count = bytecount::count(&bytes, b'\n');
+    /// let all = cloud_file.read_all().await?;
+    /// let newline_count = bytecount::count(&all, b'\n');
     /// assert_eq!(newline_count, 500);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn bytes(&self) -> Result<Bytes, CloudFileError> {
-        let bytes = self
+    pub async fn read_all(&self) -> Result<Bytes, CloudFileError> {
+        let all = self
             .cloud_service
             .get(&self.store_path)
             .await?
             .bytes()
             .await?;
-        Ok(bytes)
+        Ok(all)
     }
 
-    /// Open the file to read as a stream of bytes.
+    /// Retrieve the file's contents as a stream of
+    /// [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html).
     ///
     /// # Example
     ///
@@ -422,17 +464,17 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
     /// let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
-    /// let mut stream = cloud_file.open().await?;
+    /// let mut chunks = cloud_file.stream_chunks().await?;
     /// let mut newline_count: usize = 0;
-    /// while let Some(bytes) = stream.next().await {
-    ///     let bytes = bytes?;
-    ///     newline_count += bytecount::count(&bytes, b'\n');
+    /// while let Some(chunk) = chunks.next().await {
+    ///     let chunk = chunk?;
+    ///     newline_count += bytecount::count(&chunk, b'\n');
     ///     }
     /// assert_eq!(newline_count, 500);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn open(
+    pub async fn stream_chunks(
         &self,
     ) -> Result<BoxStream<'static, object_store::Result<Bytes>>, CloudFileError> {
         let stream = self
@@ -443,7 +485,8 @@ impl CloudFile {
         Ok(stream)
     }
 
-    ///  Open a file to read binary chunks of one or more lines, that is, each chunk ends with a newline.
+    ///  Retrieve the file's contents as a stream of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html),
+    ///  each containing one or more whole lines.
     ///
     /// # Example
     ///
@@ -459,7 +502,7 @@ impl CloudFile {
     /// let goal_index = 12;
     ///
     /// let cloud_file = CloudFile::new(url)?;
-    /// let mut line_chunks = cloud_file.line_chunks().await?;
+    /// let mut line_chunks = cloud_file.stream_line_chunks().await?;
     /// let mut index_iter = 0..;
     /// let mut goal_line = None;
     /// 'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
@@ -478,11 +521,11 @@ impl CloudFile {
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
     ///
-    pub async fn line_chunks(
+    pub async fn stream_line_chunks(
         &self,
     ) -> Result<BoxStream<'static, object_store::Result<Bytes>>, CloudFileError> {
-        let stream = self.open().await?;
-        let line_chunks = newline_delimited_stream(stream);
+        let chunks = self.stream_chunks().await?;
+        let line_chunks = newline_delimited_stream(chunks);
         Ok(Box::pin(line_chunks))
     }
 
@@ -502,9 +545,9 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let mut cloud_file = CloudFile::new(url)?;
-    /// assert_eq!(cloud_file.size().await?, 303);
+    /// assert_eq!(cloud_file.read_file_size().await?, 303);
     /// cloud_file.set_extension("fam")?;
-    /// assert_eq!(cloud_file.size().await?, 130);
+    /// assert_eq!(cloud_file.read_file_size().await?, 130);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
@@ -644,7 +687,7 @@ async fn cloud_file_2() -> Result<(), CloudFileError> {
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed",
         
     )?;
-    assert_eq!(cloud_file.size().await?, 303);
+    assert_eq!(cloud_file.read_file_size().await?, 303);
     Ok(())
 }
 
@@ -657,7 +700,7 @@ async fn line_n() -> Result<(), CloudFileError> {
     let goal_index = 12;
 
     let cloud_file = CloudFile::new(url)?;
-    let mut line_chunks = cloud_file.line_chunks().await?;
+    let mut line_chunks = cloud_file.stream_line_chunks().await?;
     let mut index_iter = 0..;
     let mut goal_line = None;
     'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
@@ -681,9 +724,9 @@ async fn line_n() -> Result<(), CloudFileError> {
 async fn cloud_file_extension() -> Result<(), CloudFileError> {
     let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     let mut cloud_file = CloudFile::new(url)?;
-    assert_eq!(cloud_file.size().await?, 303);
+    assert_eq!(cloud_file.read_file_size().await?, 303);
     cloud_file.set_extension("fam")?;
-    assert_eq!(cloud_file.size().await?, 130);
+    assert_eq!(cloud_file.read_file_size().await?, 130);
     Ok(())
 }
 
@@ -710,7 +753,7 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
     ];
 
     let cloud_file = CloudFile::new_with_options(url, options)?;
-    assert_eq!(cloud_file.size().await?, 1_250_003);
+    assert_eq!(cloud_file.read_file_size().await?, 1_250_003);
     Ok(())
 }
 
@@ -720,15 +763,15 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
 /// ```
 /// use cloud_file::abs_path_to_url_string;
 /// 
+/// // Define a sample file_name and expected_url based on the target OS
 /// #[cfg(target_os = "windows")]
-/// let file_name = r"M:\data files\small.bed";
+/// let (file_name, expected_url) = (r"M:\data files\small.bed", "file:///M:/data%20files/small.bed");
+/// 
 /// #[cfg(not(target_os = "windows"))]
-/// let file_name = r"/data files/small.bed";
+/// let (file_name, expected_url) = (r"/data files/small.bed", "file:///data%20files/small.bed");
+/// 
 /// let url = abs_path_to_url_string(file_name)?;
-/// #[cfg(target_os = "windows")]
-/// assert_eq!(url, "file:///M:/data%20files/small.bed");
-/// #[cfg(not(target_os = "windows"))]
-/// assert_eq!(url, "file:///data%20files/small.bed");
+/// assert_eq!(url, expected_url);
  /// # use cloud_file::CloudFileError;
  /// # Ok::<(), CloudFileError>(())
  /// ```
@@ -752,11 +795,11 @@ fn readme_1() {
         .block_on(async {
             let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
             let cloud_file = CloudFile::new(url)?;
-            let mut stream = cloud_file.open().await?;
+            let mut chunks = cloud_file.stream_chunks().await?;
             let mut newline_count: usize = 0;
-            while let Some(bytes) = stream.next().await {
-                let bytes = bytes?;
-                newline_count += bytecount::count(&bytes, b'\n');
+            while let Some(chunk) = chunks.next().await {
+                let chunk = chunk?;
+                newline_count += bytecount::count(&chunk, b'\n');
             }
             assert_eq!(newline_count, 500);
             Ok::<(), CloudFileError>(())

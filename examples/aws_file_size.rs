@@ -23,6 +23,6 @@ async fn main() -> Result<(), anyhow::Error> {
     ];
 
     let cloud_file = CloudFile::new_with_options(url, options)?;
-    assert_eq!(cloud_file.size().await?, 1_250_003);
+    assert_eq!(cloud_file.read_file_size().await?, 1_250_003);
     Ok(())
 }

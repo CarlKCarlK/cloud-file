@@ -19,9 +19,9 @@ async fn count_bigrams(
     };
 
     // Find the document size and then choose the two-byte ranges to sample
-    let size = cloud_file.size().await?;
+    let file_size = cloud_file.read_file_size().await?;
     let range_samples: Vec<Range<usize>> = (0..sample_count)
-        .map(|_| rng.gen_range(0..size - 1))
+        .map(|_| rng.gen_range(0..file_size - 1))
         .map(|start| start..start + 2)
         .collect();
 
@@ -33,7 +33,7 @@ async fn count_bigrams(
     // Create an iterator of future work
     let work_chunks_iterator = range_chunks.map(|chunk| {
         let cloud_file = cloud_file.clone(); // by design, clone is cheap
-        async move { cloud_file.ranges(chunk).await }
+        async move { cloud_file.read_ranges(chunk).await }
     });
 
     // Create a stream of futures to run out-of-order and with constrained concurrency.

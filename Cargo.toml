@@ -1,6 +1,6 @@
 [package]
 name = "cloud-file"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 edition = "2021"
 description = "Simple reading of cloud files in Rust"
 repository = "https://github.com/CarlKCarlK/cloud-file"

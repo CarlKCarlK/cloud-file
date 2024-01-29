@@ -39,8 +39,8 @@ use cloud_file::CloudFile;
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new(url)?;
-let size = cloud_file.size().await?;
-assert_eq!(size, 14_361);
+let file_size = cloud_file.read_file_size().await?;
+assert_eq!(file_size, 14_361);
 # Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();
 # use {cloud_file::CloudFileError, tokio::runtime::Runtime};
 ```
@@ -54,11 +54,11 @@ use futures::StreamExt; // Enables `.next()` on streams.
 
 let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
 let cloud_file = CloudFile::new_with_options(url, [("timeout", "30s")])?;
-let mut stream = cloud_file.open().await?;
+let mut chunks = cloud_file.stream_chunks().await?;
 let mut newline_count: usize = 0;
-while let Some(bytes) = stream.next().await {
-    let bytes = bytes?;
-    newline_count += bytecount::count(&bytes, b'\n');
+while let Some(chunk) = chunks.next().await {
+    let chunk = chunk?;
+    newline_count += bytecount::count(&chunk, b'\n');
 }
 assert_eq!(newline_count, 500);
 # Ok::<(), Box<dyn std::error::Error>>(()) }).unwrap();

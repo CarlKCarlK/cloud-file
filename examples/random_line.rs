@@ -14,7 +14,7 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
     let mut selected_line = None;
 
     // Each binary line_chunk contains one or more lines, that is, each chunk ends with a newline.
-    let mut line_chunks = cloud_file.line_chunks().await?;
+    let mut line_chunks = cloud_file.stream_line_chunks().await?;
     let mut index_iter = 0..;
     while let Some(line_chunk) = line_chunks.next().await {
         let line_chunk = line_chunk?;
