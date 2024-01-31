@@ -880,6 +880,6 @@ async fn local_file() -> Result<(), CloudFileError> {
 
     let apache_url = abs_path_to_url_string(env::var("CARGO_MANIFEST_DIR").unwrap() + "/LICENSE-APACHE")?;
     let cloud_file = CloudFile::new(&apache_url)?;
-    assert_eq!(cloud_file.read_file_size().await?, 9898);
+    assert_eq!(cloud_file.count_lines().await?, 175);
     Ok(())
 }
