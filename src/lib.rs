@@ -187,6 +187,38 @@ impl CloudFile {
         Ok(cloud_file)
     }
 
+    /// Create a new [`CloudFile`] from an [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
+    /// and a [`object_store::path::Path`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use cloud_file::CloudFile;
+    /// use object_store::{http::HttpBuilder, path::Path as StorePath, ClientOptions};
+    /// use std::time::Duration;
+    ///
+    /// # Runtime::new().unwrap().block_on(async {
+    /// let client_options = ClientOptions::new().with_timeout(Duration::from_secs(30));
+    /// let http = HttpBuilder::new()
+    ///     .with_url("https://raw.githubusercontent.com")
+    ///     .with_client_options(client_options)
+    ///     .build()?;
+    /// let store_path = StorePath::parse("fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed")?;
+    /// 
+    /// let cloud_file = CloudFile::from_structs(http, store_path);
+    /// assert_eq!(cloud_file.read_file_size().await?, 303);
+    /// # Ok::<(), CloudFileError>(())}).unwrap();
+    /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
+    /// ```
+
+    #[inline]
+    pub fn from_structs(store: impl ObjectStore, store_path: StorePath) -> Self {
+        CloudFile {
+            cloud_service: Arc::new(DynObjectStore(Box::new(store))),
+            store_path,
+        }
+    }
+
     /// Create a new [`CloudFile`] from a URL string and options.
     ///
     /// # Example
@@ -335,6 +367,7 @@ impl CloudFile {
     /// let bytes = get_result
     ///     .bytes()
     ///     .await?;
+    /// assert_eq!(bytes.len(), 3);
     /// assert_eq!(bytes[0], 0x6c);
     /// assert_eq!(bytes[1], 0x1b);
     /// assert_eq!(bytes[2], 0x01);
@@ -361,7 +394,8 @@ impl CloudFile {
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
     /// let cloud_file = CloudFile::new(url)?;
-    /// let (bytes, size) = cloud_file.read_range_and_file_size (0..3).await?;
+    /// let (bytes, size) = cloud_file.read_range_and_file_size(0..3).await?;
+    /// assert_eq!(bytes.len(), 3);
     /// assert_eq!(bytes[0], 0x6c);
     /// assert_eq!(bytes[1], 0x1b);
     /// assert_eq!(bytes[2], 0x01);
@@ -507,7 +541,7 @@ impl CloudFile {
     /// let mut goal_line = None;
     /// 'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
     ///     let line_chunk = line_chunk?;
-    ///     let lines = from_utf8(&line_chunk)?.split_terminator('\n');
+    ///     let lines = from_utf8(&line_chunk)?.lines();
     ///     for line in lines {
     ///         let index = index_iter.next().unwrap(); // Safe because the iterator is infinite
     ///         if index == goal_index {
@@ -652,7 +686,8 @@ impl Deref for DynObjectStore {
 }
 
 impl DynObjectStore {
-    fn new<T: ObjectStore + 'static>(store: T) -> Self {
+    #[inline]
+    fn new(store: impl ObjectStore ) -> Self {
         DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
 }
@@ -705,7 +740,7 @@ async fn line_n() -> Result<(), CloudFileError> {
     let mut goal_line = None;
     'outer_loop: while let Some(line_chunk) = line_chunks.next().await {
         let line_chunk = line_chunk?;
-        let lines = from_utf8(&line_chunk)?.split_terminator('\n');
+        let lines = from_utf8(&line_chunk)?.lines();
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
             if index == goal_index {
@@ -807,3 +842,44 @@ fn readme_1() {
         .unwrap();
 }
 
+
+#[tokio::test]
+async fn check_file_signature() -> Result<(), CloudFileError> {
+    let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    let cloud_file = CloudFile::new(url)?;
+    let (bytes, size) = cloud_file.read_range_and_file_size(0..3).await?;
+
+    assert_eq!(bytes.len(), 3);
+    assert_eq!(bytes[0], 0x6c);
+    assert_eq!(bytes[1], 0x1b);
+    assert_eq!(bytes[2], 0x01);
+    assert_eq!(size, 303);
+    Ok(())
+}
+
+#[tokio::test]
+async fn from_structs_example() -> Result<(), CloudFileError> {
+    use object_store::{http::HttpBuilder, path::Path as StorePath, ClientOptions};
+    use std::time::Duration;
+
+    let client_options = ClientOptions::new().with_timeout(Duration::from_secs(30));
+    let http = HttpBuilder::new()
+        .with_url("https://raw.githubusercontent.com")
+        .with_client_options(client_options)
+        .build()?;
+    let store_path = StorePath::parse("fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed")?;
+
+    let cloud_file = CloudFile::from_structs(http, store_path);
+    assert_eq!(cloud_file.read_file_size().await?, 303);
+    Ok(())
+}
+
+#[tokio::test]
+async fn local_file() -> Result<(), CloudFileError> {
+    use std::env;
+
+    let apache_url = abs_path_to_url_string(env::var("CARGO_MANIFEST_DIR").unwrap() + "/LICENSE-APACHE")?;
+    let cloud_file = CloudFile::new(&apache_url)?;
+    assert_eq!(cloud_file.read_file_size().await?, 9898);
+    Ok(())
+}

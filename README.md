@@ -68,7 +68,7 @@ assert_eq!(newline_count, 500);
 More examples
 --------------
 
-| Example                                       | Description                                   |
+| Example                                       | Demonstrates                                  |
 |-----------------------------------------------|-----------------------------------------------|
 | [`line_count`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/line_count.rs)     | Read a file as binary chunks.  |
 | [`random_line`](https://github.com/CarlKCarlK/cloud-file/blob/main/examples/random_line.rs)   | Read a file as text lines.        |

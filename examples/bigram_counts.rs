@@ -1,3 +1,6 @@
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("This code requires a 64-bit target architecture.");
+
 use cloud_file::CloudFile;
 use futures::pin_mut;
 use futures_util::StreamExt;
@@ -18,12 +21,16 @@ async fn count_bigrams(
         StdRng::from_entropy()
     };
 
-    // Find the document size and then choose the two-byte ranges to sample
+    // Find the document size
     let file_size = cloud_file.read_file_size().await?;
+
+    // Randomly choose the two-byte ranges to sample
     let range_samples: Vec<Range<usize>> = (0..sample_count)
         .map(|_| rng.gen_range(0..file_size - 1))
         .map(|start| start..start + 2)
         .collect();
+
+    // println!("{:?}", range_samples);
 
     // Divide the ranges into chunks respecting the max_chunk_bytes limit
     const BYTES_PER_BIGRAM: usize = 2;
@@ -65,14 +72,13 @@ async fn count_bigrams(
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let cloud_file = CloudFile::new_with_options(
-        "https://www.gutenberg.org/cache/epub/100/pg100.txt",
-        [("timeout", "30s")],
-    )?;
+    let url = "https://www.gutenberg.org/cache/epub/100/pg100.txt";
+    let options = [("timeout", "30s")];
+    let cloud_file = CloudFile::new_with_options(url, options)?;
 
     let seed = Some(0u64);
     let sample_count = 10_000;
-    let max_chunk_bytes = 500; // 8_000_000 is a good default when chunks are bigger.
+    let max_chunk_bytes = 750; // 8_000_000 is a good default when chunks are bigger.
     let max_concurrent_requests = 10; // 10 is a good default
 
     count_bigrams(

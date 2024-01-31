@@ -1,3 +1,4 @@
+// cmk delete this example and adjust links in README???
 use anyhow::anyhow;
 use cloud_file::CloudFile;
 use futures::StreamExt;
@@ -18,7 +19,7 @@ async fn random_line(cloud_file: &CloudFile, seed: Option<u64>) -> Result<String
     let mut index_iter = 0..;
     while let Some(line_chunk) = line_chunks.next().await {
         let line_chunk = line_chunk?;
-        let lines = from_utf8(&line_chunk)?.split_terminator('\n');
+        let lines = from_utf8(&line_chunk)?.lines();
         for line in lines {
             let index = index_iter.next().unwrap(); // safe because we know the iterator is infinite
 
