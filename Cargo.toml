@@ -1,13 +1,13 @@
 [package]
 name = "cloud-file"
-version = "0.1.0-beta.2"
+version = "0.1.0-beta.3"
 edition = "2021"
 description = "Simple reading of cloud files in Rust"
 repository = "https://github.com/CarlKCarlK/cloud-file"
 readme = "README.md"
 documentation = "https://docs.rs/cloud-file/latest/cloud-file/"
 authors = ["Carl Kadie"]
-license = "MIT OR Apache-2.0" # toml-ignore
+license = "MIT OR Apache-2.0"  # toml-ignore
 keywords = ["cloud", "file", "http","aws", "azure"]
 categories = ["Web Programming::HTTP Client", "Filesystem", "API bindings"]
 homepage = "https://github.com/CarlKCarlK/cloud-file"

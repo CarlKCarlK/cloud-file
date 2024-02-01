@@ -435,7 +435,7 @@ impl CloudFile {
     ///
     /// ```rust
     /// use cloud_file::CloudFile;
-    /// use futures_util::StreamExt;
+    /// use futures_util::StreamExt;  // Enables `.next()` on streams.
     ///
     /// # Runtime::new().unwrap().block_on(async {
     /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
@@ -729,7 +729,7 @@ async fn cloud_file_2() -> Result<(), CloudFileError> {
 #[tokio::test]
 async fn line_n() -> Result<(), CloudFileError> {
     use std::str::from_utf8;
-    use futures_util::StreamExt;
+    use futures_util::StreamExt;  // Enables `.next()` on streams.
 
     let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
     let goal_index = 12;
@@ -822,7 +822,7 @@ pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFil
 
 #[test]
 fn readme_1() {
-    use futures_util::StreamExt;
+    use futures_util::StreamExt;  // Enables `.next()` on streams.
     use tokio::runtime::Runtime;
 
     Runtime::new()

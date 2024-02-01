@@ -1,7 +1,7 @@
 // cmk delete this example and adjust links in README???
 use anyhow::anyhow;
 use cloud_file::CloudFile;
-use futures::StreamExt;
+use futures::StreamExt; // Enables `.next()` on streams.
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::str::from_utf8;
 

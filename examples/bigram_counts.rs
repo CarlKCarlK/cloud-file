@@ -3,7 +3,7 @@ compile_error!("This code requires a 64-bit target architecture.");
 
 use cloud_file::CloudFile;
 use futures::pin_mut;
-use futures_util::StreamExt;
+use futures_util::StreamExt; // Enables `.next()` on streams.
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{cmp::max, collections::HashMap, ops::Range};
 
@@ -46,7 +46,7 @@ async fn count_bigrams(
     // Create a stream of futures to run out-of-order and with constrained concurrency.
     let work_chunks_stream =
         futures_util::stream::iter(work_chunks_iterator).buffer_unordered(max_concurrent_requests);
-    pin_mut!(work_chunks_stream);
+    pin_mut!(work_chunks_stream); // The compiler says we need this
 
     // Run the futures and, as result bytes come in, tabulate.
     let mut bigram_counts = HashMap::new();
