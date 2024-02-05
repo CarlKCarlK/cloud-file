@@ -1,4 +1,4 @@
-// For comparison, here is a version of line_counts.rs that uses the object_store directly
+// For comparison, here is a version of line_count.rs that uses the object_store directly
 // rather than the cloud-file wrapper crate.
 use futures_util::StreamExt; // Enables `.next()` on streams.
 pub use object_store::path::Path as StorePath;

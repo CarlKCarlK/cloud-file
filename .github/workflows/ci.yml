@@ -35,7 +35,11 @@ jobs:
           cargo test --verbose
       - name: Run Examples
         run: |
-          cargo run --verbose --example aws_file_size
-          cargo run --verbose --example bigram_counts
           cargo run --verbose --example line_count
-          cargo run --verbose --example random_line          
+          cargo run --verbose --example nth_line
+          cargo run --verbose --example bigram_counts
+          cargo run --verbose --example aws_file_size
+          cargo run --verbose --example line_count_structs
+          cargo run --verbose --example line_count_local
+          cargo run --verbose --example aws_file_size_structs
+          cargo run --verbose --example random_line

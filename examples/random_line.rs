@@ -1,4 +1,3 @@
-// cmk delete this example and adjust links in README???
 use anyhow::anyhow;
 use cloud_file::CloudFile;
 use futures::StreamExt; // Enables `.next()` on streams.

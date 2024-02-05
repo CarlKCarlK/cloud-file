@@ -1,9 +1,9 @@
-// For comparison, here is a local version of line_counts.rs
+// For comparison, here is a local version of line_count.rs
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
 fn main() -> io::Result<()> {
-    let path = "examples/line_counts_local.rs";
+    let path = "examples/line_count_local.rs";
     let reader = BufReader::new(File::open(path)?);
     let mut line_count = 0;
     for line in reader.lines() {

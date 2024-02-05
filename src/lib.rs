@@ -14,8 +14,8 @@
 //!
 //! | Function | Description |
 //! | -------- | ----------- |
-//! | [`CloudFile::new`](struct.CloudFile.html#method.new) | Use a URL to specify a cloud file for reading. |
-//! | [`CloudFile::new_with_options`](struct.CloudFile.html#method.new_with_options) | Use a URL and options to specify a cloud file for reading. |
+//! | [`CloudFile::new`](struct.CloudFile.html#method.new) | Use a URL string to specify a cloud file for reading. |
+//! | [`CloudFile::new_with_options`](struct.CloudFile.html#method.new_with_options) | Use a URL string and string options to specify a cloud file for reading. |
 //!
 //! ## URLs
 //!
@@ -39,8 +39,6 @@
 //! 
 //!
 //! ## High-Level [`CloudFile`](struct.CloudFile.html) Methods
-//! 
-//! These methods retrieve a stream, do a one-shot read, or count.
 //! 
 //! | Method                        | Retrieves                                                                                                  |
 //! |-------------------------------|-------------------------------------------------------------------|
