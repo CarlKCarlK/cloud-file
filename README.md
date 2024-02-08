@@ -20,6 +20,8 @@ Highlights
 * Read binary or text
 * Fully async
 * Used by genomics crate [BedReader](https://github.com/fastlmm/BedReader), which is used by other Rust and Python projects
+* Also see [Nine Rules for Accessing Cloud Files from Your Rust Code
+Practical Lessons from Upgrading Bed-Reader, a Bioinformatics Library](https://medium.com/towards-data-science/nine-rules-for-accessing-cloud-files-from-your-rust-code-d456c1e2ceb4) in *Towards Data Science*.
 
 Install
 -------

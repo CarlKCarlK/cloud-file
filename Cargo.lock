@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cloud-file"
-version = "0.1.0-beta.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytecount",
