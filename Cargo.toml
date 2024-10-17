@@ -1,27 +1,32 @@
 [package]
 name = "cloud-file"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 description = "Simple reading of cloud files in Rust"
 repository = "https://github.com/CarlKCarlK/cloud-file"
 readme = "README.md"
 documentation = "https://docs.rs/cloud-file/latest/cloud-file/"
 authors = ["Carl Kadie"]
-license = "MIT OR Apache-2.0"  # toml-ignore
-keywords = ["cloud", "file", "http","aws", "azure"]
+license = "MIT OR Apache-2.0"                                               # toml-ignore
+keywords = ["cloud", "file", "http", "aws", "azure"]
 categories = ["web-programming::http-client", "filesystem", "api-bindings"]
 homepage = "https://github.com/CarlKCarlK/cloud-file"
 
 
 [dependencies]
 # when object_store goes to 0.9.1 check if can remove http cloud options work around code.
-object_store = { version = "0.9.1", features = ["http", "aws", "azure", "gcp"] }
+object_store = { version = "0.11.0", features = [
+    "http",
+    "aws",
+    "azure",
+    "gcp",
+] }
 futures = "0.3.30"
-tokio = { version = "1.36.0", features = ["full"]}
+tokio = { version = "1.36.0", features = ["full"] }
 bytecount = "0.6.7"
 bytes = "1.5.0"
 url = "2.5.0"
-futures-util = { version = "0.3.29"}
+futures-util = { version = "0.3.29" }
 thiserror = "1.0.56"
 
 [dev-dependencies]

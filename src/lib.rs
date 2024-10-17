@@ -763,7 +763,7 @@ async fn cloud_file_extension() -> Result<(), CloudFileError> {
     Ok(())
 }
 
-// The AWS tests are skipped to credentials are not available.
+// The AWS tests are skipped if credentials are not available.
 #[tokio::test]
 async fn s3_play_cloud() -> Result<(), CloudFileError> {
     use rusoto_credential::{CredentialsError, ProfileProvider, ProvideAwsCredentials};
