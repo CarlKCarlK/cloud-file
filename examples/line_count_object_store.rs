@@ -2,7 +2,7 @@
 // rather than the cloud-file wrapper crate.
 use futures_util::StreamExt; // Enables `.next()` on streams.
 pub use object_store::path::Path as StorePath;
-use object_store::{parse_url_opts, ObjectStore};
+use object_store::{parse_url_opts, ObjectStore, ObjectStoreExt};
 use std::sync::Arc;
 use url::Url;
 

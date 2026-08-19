@@ -26,7 +26,7 @@
 //! | AWS S3        | `s3://bedreader/v1/toydata.5chrom.bed` |
 //!
 //! Note: For local files, use the [`abs_path_to_url_string`](fn.abs_path_to_url_string.html) function to properly encode into a URL.
-//! 
+//!
 //! ## Options
 //!
 //! | Cloud Service | Details | Example |
@@ -36,10 +36,10 @@
 //! | AWS S3 | [`AmazonS3ConfigKey`](https://docs.rs/object_store/latest/object_store/aws/enum.AmazonS3ConfigKey.html) | `[("aws_region", "us-west-2"), ("aws_access_key_id",` ...`), ("aws_secret_access_key",` ...`)]` |
 //! | Azure | [`AzureConfigKey`](https://docs.rs/object_store/latest/object_store/azure/enum.AzureConfigKey.html) |  |
 //! | Google | [`GoogleConfigKey`](https://docs.rs/object_store/latest/object_store/gcp/enum.GoogleConfigKey.html) |  |
-//! 
+//!
 //!
 //! ## High-Level [`CloudFile`](struct.CloudFile.html) Methods
-//! 
+//!
 //! | Method                        | Retrieves                                                                                                  |
 //! |-------------------------------|-------------------------------------------------------------------|
 //! | [`stream_chunks`](struct.CloudFile.html#method.stream_chunks)       | File contents as a stream of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) |
@@ -50,28 +50,29 @@
 //! | [`read_range_and_file_size`](struct.CloudFile.html#method.read_range_and_file_size) | [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from a specified range & the file's size |
 //! | [`read_file_size`](struct.CloudFile.html#method.read_file_size)    | Size of the file                                     |
 //! | [`count_lines`](struct.CloudFile.html#method.count_lines)          | Number of lines in the file                          |
-//! 
+//!
 //! Additional methods:
-//! 
+//!
 //! | Method                        | Description                                                                                                  |
 //! |-------------------------------|-------------------------------------------------------------------|
 //! | [`clone`](struct.CloudFile.html#method.clone)                      | Clone the [`CloudFile`](struct.CloudFile.html) instance. Efficient by design. |
 //! | [`set_extension`](struct.CloudFile.html#method.set_extension)      | Change the [`CloudFile`](struct.CloudFile.html)'s file extension (in place).  |
 //!
 //! ## Low-Level [`CloudFile`](struct.CloudFile.html) Methods
-//! 
+//!
 //! | Method | Description |
 //! | -------- | ----------- |
 //! | [`get`](struct.CloudFile.html#method.get) | Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get) crate's `get` method. |
 //! | [`get_opts`](struct.CloudFile.html#method.get_opts) | Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate's `get_opts` method. |
-//! 
+//!
 //! ## Lowest-Level [`CloudFile`](struct.CloudFile.html) Methods
-//! 
+//!
 //! You can call any method from the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) crate. For example, here we
 //! use [`head`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#tymethod.head) to get the metadata for a file and the last_modified time.
-//! 
+//!
 //! ```
 //! use cloud_file::CloudFile;
+//! use object_store::ObjectStoreExt;
 //!
 //! # Runtime::new().unwrap().block_on(async {
 //! let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
@@ -88,14 +89,14 @@
 compile_error!("This code requires a 64-bit target architecture.");
 
 use bytes::Bytes;
-use object_store::delimited::newline_delimited_stream;
 use core::fmt;
 use futures_util::stream::BoxStream;
 use futures_util::TryStreamExt;
+use object_store::delimited::newline_delimited_stream;
 use object_store::http::HttpBuilder;
 #[doc(no_inline)]
 pub use object_store::path::Path as StorePath;
-use object_store::{GetOptions, GetRange, GetResult, ObjectStore};
+use object_store::{GetOptions, GetRange, GetResult, ObjectStore, ObjectStoreExt};
 use std::ops::{Deref, Range};
 use std::path::Path;
 use std::sync::Arc;
@@ -143,11 +144,11 @@ impl Clone for CloudFile {
 }
 
 /// An empty set of cloud options
-/// 
+///
 /// # Example
 /// ```
 /// use cloud_file::{EMPTY_OPTIONS, CloudFile};
-/// 
+///
 /// # Runtime::new().unwrap().block_on(async {
 /// let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
 /// let cloud_file = CloudFile::new_with_options(url, EMPTY_OPTIONS)?;
@@ -187,9 +188,9 @@ impl CloudFile {
 
     /// Create a new [`CloudFile`] from an [`ObjectStore`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html)
     /// and a [`object_store::path::Path`](https://docs.rs/object_store/latest/object_store/path/struct.Path.html).
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use cloud_file::CloudFile;
     /// use object_store::{http::HttpBuilder, path::Path as StorePath, ClientOptions};
@@ -202,7 +203,7 @@ impl CloudFile {
     ///     .with_client_options(client_options)
     ///     .build()?;
     /// let store_path = StorePath::parse("fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed")?;
-    /// 
+    ///
     /// let cloud_file = CloudFile::from_structs(http, store_path);
     /// assert_eq!(cloud_file.read_file_size().await?, 303);
     /// # Ok::<(), CloudFileError>(())}).unwrap();
@@ -291,7 +292,7 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn read_file_size(&self) -> Result<usize, CloudFileError> {
+    pub async fn read_file_size(&self) -> Result<u64, CloudFileError> {
         let meta = self.cloud_service.head(&self.store_path).await?;
         Ok(meta.size)
     }
@@ -310,12 +311,12 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn read_range(&self, range: Range<usize>) -> Result<Bytes, CloudFileError> {
+    pub async fn read_range(&self, range: Range<u64>) -> Result<Bytes, CloudFileError> {
         Ok(self
             .cloud_service
             .get_range(&self.store_path, range)
             .await?)
-    }    
+    }
 
     /// Return the `Vec` of [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) from specified ranges.
     ///
@@ -333,7 +334,7 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn read_ranges(&self, ranges: &[Range<usize>]) -> Result<Vec<Bytes>, CloudFileError> {
+    pub async fn read_ranges(&self, ranges: &[Range<u64>]) -> Result<Vec<Bytes>, CloudFileError> {
         Ok(self
             .cloud_service
             .get_ranges(&self.store_path, ranges)
@@ -341,7 +342,7 @@ impl CloudFile {
     }
 
     /// Call the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#method.get_opts) crate's `get_opts` method.
-    /// 
+    ///
     /// You can, for example, in one call retrieve a range of bytes from the file and the file's metadata. The
     /// result is a [`GetResult`](https://docs.rs/object_store/latest/object_store/struct.GetResult.html).
     ///
@@ -361,7 +362,7 @@ impl CloudFile {
     ///     ..Default::default()
     /// };
     /// let get_result = cloud_file.get_opts(get_options).await?;
-    /// let size: usize = get_result.meta.size;
+    /// let size: u64 = get_result.meta.size;
     /// let bytes = get_result
     ///     .bytes()
     ///     .await?;
@@ -401,10 +402,10 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-    pub async fn read_range_and_file_size (
+    pub async fn read_range_and_file_size(
         &self,
-        range: Range<usize>,
-    ) -> Result<(Bytes, usize), CloudFileError> {
+        range: Range<u64>,
+    ) -> Result<(Bytes, u64), CloudFileError> {
         let get_options = GetOptions {
             range: Some(GetRange::Bounded(range)),
             ..Default::default()
@@ -413,7 +414,7 @@ impl CloudFile {
             .cloud_service
             .get_opts(&self.store_path, get_options)
             .await?;
-        let size: usize = get_result.meta.size;
+        let size = get_result.meta.size;
         let bytes = get_result
             .bytes()
             .await
@@ -561,7 +562,6 @@ impl CloudFile {
         Ok(Box::pin(line_chunks))
     }
 
-
     /// Change the [`CloudFile`]'s extension (in place).
     ///
     /// It removes the current extension, if any.
@@ -685,7 +685,7 @@ impl Deref for DynObjectStore {
 
 impl DynObjectStore {
     #[inline]
-    fn new(store: impl ObjectStore ) -> Self {
+    fn new(store: impl ObjectStore) -> Self {
         DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
 }
@@ -718,7 +718,7 @@ pub enum CloudFileError {
 async fn cloud_file_2() -> Result<(), CloudFileError> {
     let cloud_file = CloudFile::new(
         "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed",
-        
+
     )?;
     assert_eq!(cloud_file.read_file_size().await?, 303);
     Ok(())
@@ -726,8 +726,8 @@ async fn cloud_file_2() -> Result<(), CloudFileError> {
 
 #[tokio::test]
 async fn line_n() -> Result<(), CloudFileError> {
-    use std::str::from_utf8;
-    use futures_util::StreamExt;  // Enables `.next()` on streams.
+    use futures_util::StreamExt;
+    use std::str::from_utf8; // Enables `.next()` on streams.
 
     let url = "https://raw.githubusercontent.com/fastlmm/bed-sample-files/main/toydata.5chrom.fam";
     let goal_index = 12;
@@ -751,7 +751,6 @@ async fn line_n() -> Result<(), CloudFileError> {
     assert_eq!(goal_line, Some("per12 per12 0 0 2 -0.0382707".to_string()));
     Ok(())
 }
-
 
 #[tokio::test]
 async fn cloud_file_extension() -> Result<(), CloudFileError> {
@@ -791,23 +790,23 @@ async fn s3_play_cloud() -> Result<(), CloudFileError> {
 }
 
 /// Given a local file's absolute path, return a URL string to that file.
-/// 
+///
 /// # Example
 /// ```
 /// use cloud_file::abs_path_to_url_string;
-/// 
+///
 /// // Define a sample file_name and expected_url based on the target OS
 /// #[cfg(target_os = "windows")]
 /// let (file_name, expected_url) = (r"M:\data files\small.bed", "file:///M:/data%20files/small.bed");
-/// 
+///
 /// #[cfg(not(target_os = "windows"))]
 /// let (file_name, expected_url) = (r"/data files/small.bed", "file:///data%20files/small.bed");
-/// 
+///
 /// let url = abs_path_to_url_string(file_name)?;
 /// assert_eq!(url, expected_url);
- /// # use cloud_file::CloudFileError;
- /// # Ok::<(), CloudFileError>(())
- /// ```
+/// # use cloud_file::CloudFileError;
+/// # Ok::<(), CloudFileError>(())
+/// ```
 pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFileError> {
     let path = path.as_ref();
     let url = Url::from_file_path(path)
@@ -820,7 +819,7 @@ pub fn abs_path_to_url_string(path: impl AsRef<Path>) -> Result<String, CloudFil
 
 #[test]
 fn readme_1() {
-    use futures_util::StreamExt;  // Enables `.next()` on streams.
+    use futures_util::StreamExt; // Enables `.next()` on streams.
     use tokio::runtime::Runtime;
 
     Runtime::new()
@@ -839,7 +838,6 @@ fn readme_1() {
         })
         .unwrap();
 }
-
 
 #[tokio::test]
 async fn check_file_signature() -> Result<(), CloudFileError> {
@@ -865,7 +863,8 @@ async fn from_structs_example() -> Result<(), CloudFileError> {
         .with_url("https://raw.githubusercontent.com")
         .with_client_options(client_options)
         .build()?;
-    let store_path = StorePath::parse("fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed")?;
+    let store_path =
+        StorePath::parse("fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed")?;
 
     let cloud_file = CloudFile::from_structs(http, store_path);
     assert_eq!(cloud_file.read_file_size().await?, 303);
@@ -876,7 +875,8 @@ async fn from_structs_example() -> Result<(), CloudFileError> {
 async fn local_file() -> Result<(), CloudFileError> {
     use std::env;
 
-    let apache_url = abs_path_to_url_string(env::var("CARGO_MANIFEST_DIR").unwrap() + "/LICENSE-APACHE")?;
+    let apache_url =
+        abs_path_to_url_string(env::var("CARGO_MANIFEST_DIR").unwrap() + "/LICENSE-APACHE")?;
     let cloud_file = CloudFile::new(&apache_url)?;
     assert_eq!(cloud_file.count_lines().await?, 175);
     Ok(())

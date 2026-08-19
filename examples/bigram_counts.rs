@@ -25,7 +25,7 @@ async fn count_bigrams(
     let file_size = cloud_file.read_file_size().await?;
 
     // Randomly choose the two-byte ranges to sample
-    let range_samples: Vec<Range<usize>> = (0..sample_count)
+    let range_samples: Vec<Range<u64>> = (0..sample_count)
         .map(|_| rng.gen_range(0..file_size - 1))
         .map(|start| start..start + 2)
         .collect();

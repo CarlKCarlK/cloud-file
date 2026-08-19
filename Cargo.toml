@@ -1,6 +1,6 @@
 [package]
 name = "cloud-file"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Simple reading of cloud files in Rust"
 repository = "https://github.com/CarlKCarlK/cloud-file"
@@ -15,7 +15,7 @@ homepage = "https://github.com/CarlKCarlK/cloud-file"
 
 [dependencies]
 # when object_store goes to 0.9.1 check if can remove http cloud options work around code.
-object_store = { version = "0.11.0", features = [
+object_store = { version = "0.14.1", features = [
     "http",
     "aws",
     "azure",
