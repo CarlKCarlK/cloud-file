@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-18
+
+### Breaking changes
+
+- Use `u64` for file sizes and byte ranges so files larger than the platform's
+  `usize` can be addressed correctly.
+
+### Changed
+
+- Upgrade `object_store` to 0.14.1 and refresh dependencies, including the
+  patched `quinn-proto` release.
+
 ## [0.1.2] - 2024-03-06
 
 Update Tokio because of <https://github.com/tokio-rs/tokio/issues/6369>.
