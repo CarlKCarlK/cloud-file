@@ -5,7 +5,11 @@ use cloud_file::CloudFile;
 use futures::pin_mut;
 use futures_util::StreamExt; // Enables `.next()` on streams.
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::{cmp::max, collections::HashMap, ops::Range};
+use std::{
+    cmp::{max, Reverse},
+    collections::HashMap,
+    ops::Range,
+};
 
 async fn count_bigrams(
     cloud_file: CloudFile,
@@ -61,7 +65,7 @@ async fn count_bigrams(
 
     // Sort the bigrams by count and print the top 10
     let mut bigram_count_vec: Vec<(_, usize)> = bigram_counts.into_iter().collect();
-    bigram_count_vec.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+    bigram_count_vec.sort_by_key(|&(_, count)| Reverse(count));
     for (bigram, count) in bigram_count_vec.into_iter().take(10) {
         let char0 = (bigram.0 as char).escape_default();
         let char1 = (bigram.1 as char).escape_default();
