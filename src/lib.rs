@@ -68,7 +68,7 @@
 //! ## Lowest-Level [`CloudFile`](struct.CloudFile.html) Methods
 //!
 //! You can call any method from the [`object_store`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html) crate. For example, here we
-//! use [`head`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#tymethod.head) to get the metadata for a file and the last_modified time.
+//! use [`head`](https://docs.rs/object_store/latest/object_store/trait.ObjectStore.html#tymethod.head) to get the metadata for a file and the `last_modified` time.
 //!
 //! ```
 //! use cloud_file::CloudFile;
@@ -209,7 +209,6 @@ impl CloudFile {
     /// # Ok::<(), CloudFileError>(())}).unwrap();
     /// # use {tokio::runtime::Runtime, cloud_file::CloudFileError};
     /// ```
-
     #[inline]
     pub fn from_structs(store: impl ObjectStore, store_path: StorePath) -> Self {
         CloudFile {
