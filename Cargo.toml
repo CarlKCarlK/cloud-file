@@ -15,7 +15,7 @@ homepage = "https://github.com/CarlKCarlK/cloud-file"
 
 
 [dependencies]
-# when object_store goes to 0.9.1 check if can remove http cloud options work around code.
+# when object_store goes to 0.9.1 check if can remove http cloud options work around code. (may no longer apply: removed with object_store 0.14.1)
 object_store = { version = "0.14.1", features = [
     "http",
     "aws",

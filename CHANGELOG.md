@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Use `object_store::parse_url_opts` directly for HTTP(S) URLs. The
+  work-around for apache/arrow-rs#5310 (options ignored for HTTP stores) is
+  no longer needed with object_store 0.14.1; add a regression test showing
+  options such as `allow_http` reach the store.
+
 ## [0.3.1] - 2026-08-18
 
 - Fix the GitHub Actions status badge in the README.

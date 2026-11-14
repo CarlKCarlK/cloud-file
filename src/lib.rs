@@ -93,10 +93,9 @@ use core::fmt;
 use futures_util::stream::BoxStream;
 use futures_util::TryStreamExt;
 use object_store::delimited::newline_delimited_stream;
-use object_store::http::HttpBuilder;
 #[doc(no_inline)]
 pub use object_store::path::Path as StorePath;
-use object_store::{GetOptions, GetRange, GetResult, ObjectStore, ObjectStoreExt};
+use object_store::{parse_url_opts, GetOptions, GetRange, GetResult, ObjectStore, ObjectStoreExt};
 use std::ops::{Deref, Range};
 use std::path::Path;
 use std::sync::Arc;
@@ -177,10 +176,9 @@ impl CloudFile {
         let url = Url::parse(location)
             .map_err(|e| CloudFileError::CannotParseUrl(location.to_string(), e.to_string()))?;
 
-        let (object_store, store_path): (DynObjectStore, StorePath) =
-            parse_url_opts_work_around(&url, EMPTY_OPTIONS)?;
+        let (object_store, store_path) = parse_url_opts(&url, EMPTY_OPTIONS)?;
         let cloud_file = CloudFile {
-            cloud_service: Arc::new(object_store),
+            cloud_service: Arc::new(DynObjectStore(object_store)),
             store_path,
         };
         Ok(cloud_file)
@@ -243,10 +241,9 @@ impl CloudFile {
         let url = Url::parse(location)
             .map_err(|e| CloudFileError::CannotParseUrl(location.to_string(), e.to_string()))?;
 
-        let (object_store, store_path): (DynObjectStore, StorePath) =
-            parse_url_opts_work_around(&url, options)?;
+        let (object_store, store_path) = parse_url_opts(&url, options)?;
         let cloud_file = CloudFile {
-            cloud_service: Arc::new(object_store),
+            cloud_service: Arc::new(DynObjectStore(object_store)),
             store_path,
         };
         Ok(cloud_file)
@@ -604,64 +601,6 @@ impl CloudFile {
 }
 
 #[allow(clippy::match_bool)]
-fn parse_work_around(url: &Url) -> Result<(bool, StorePath), object_store::Error> {
-    let strip_bucket = || Some(url.path().strip_prefix('/')?.split_once('/')?.1);
-
-    let (scheme, path) = match (url.scheme(), url.host_str()) {
-        ("http", Some(_)) => (true, url.path()),
-        ("https", Some(host)) => {
-            if host.ends_with("dfs.core.windows.net")
-                || host.ends_with("blob.core.windows.net")
-                || host.ends_with("dfs.fabric.microsoft.com")
-                || host.ends_with("blob.fabric.microsoft.com")
-            {
-                (false, url.path())
-            } else if host.ends_with("amazonaws.com") {
-                match host.starts_with("s3") {
-                    true => (false, strip_bucket().unwrap_or_default()),
-                    false => (false, url.path()),
-                }
-            } else if host.ends_with("r2.cloudflarestorage.com") {
-                (false, strip_bucket().unwrap_or_default())
-            } else {
-                (true, url.path())
-            }
-        }
-        _ => (false, url.path()),
-    };
-
-    Ok((scheme, StorePath::from_url_path(path)?))
-}
-
-// LATER when https://github.com/apache/arrow-rs/issues/5310 gets fixed, can remove work around
-fn parse_url_opts_work_around<I, K, V>(
-    url: &Url,
-    options: I,
-) -> Result<(DynObjectStore, StorePath), object_store::Error>
-where
-    I: IntoIterator<Item = (K, V)>,
-    K: AsRef<str>,
-    V: Into<String>,
-{
-    let (is_http, path) = parse_work_around(url)?;
-    if is_http {
-        let url = &url[..url::Position::BeforePath];
-        let path = StorePath::parse(path)?;
-        let builder = options.into_iter().fold(
-            <HttpBuilder>::new().with_url(url),
-            |builder, (key, value)| match key.as_ref().parse() {
-                Ok(k) => builder.with_config(k, value),
-                Err(_) => builder,
-            },
-        );
-        let store = DynObjectStore::new(builder.build()?);
-        Ok((store, path))
-    } else {
-        let (store, path) = object_store::parse_url_opts(url, options)?;
-        Ok((DynObjectStore(store), path))
-    }
-}
-
 impl fmt::Display for CloudFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CloudFile: {:?}", self.store_path)
@@ -679,13 +618,6 @@ impl Deref for DynObjectStore {
 
     fn deref(&self) -> &Self::Target {
         &*self.0
-    }
-}
-
-impl DynObjectStore {
-    #[inline]
-    fn new(store: impl ObjectStore) -> Self {
-        DynObjectStore(Box::new(store) as Box<dyn ObjectStore>)
     }
 }
 
@@ -878,5 +810,18 @@ async fn local_file() -> Result<(), CloudFileError> {
         abs_path_to_url_string(env::var("CARGO_MANIFEST_DIR").unwrap() + "/LICENSE-APACHE")?;
     let cloud_file = CloudFile::new(&apache_url)?;
     assert_eq!(cloud_file.count_lines().await?, 175);
+    Ok(())
+}
+
+#[tokio::test]
+async fn http_options_reach_the_store() -> Result<(), CloudFileError> {
+    // object_store once ignored options for HTTP(S) URLs (apache/arrow-rs#5310), which
+    // cloud-file worked around. A plain `http://` URL is refused unless `allow_http` is
+    // passed, so success here shows the option reached the HTTP store.
+    let url = "http://raw.githubusercontent.com/fastlmm/bed-sample-files/main/plink_sim_10s_100v_10pmiss.bed";
+    let refused = CloudFile::new(url)?;
+    assert!(refused.read_file_size().await.is_err());
+    let allowed = CloudFile::new_with_options(url, [("allow_http", "true")])?;
+    assert_eq!(allowed.read_file_size().await?, 303);
     Ok(())
 }
