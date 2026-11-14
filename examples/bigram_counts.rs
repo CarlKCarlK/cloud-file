@@ -61,7 +61,7 @@ async fn count_bigrams(
 
     // Sort the bigrams by count and print the top 10
     let mut bigram_count_vec: Vec<(_, usize)> = bigram_counts.into_iter().collect();
-    bigram_count_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    bigram_count_vec.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
     for (bigram, count) in bigram_count_vec.into_iter().take(10) {
         let char0 = (bigram.0 as char).escape_default();
         let char1 = (bigram.1 as char).escape_default();
